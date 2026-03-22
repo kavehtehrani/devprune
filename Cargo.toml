@@ -24,3 +24,8 @@ rayon = "1"
 tempfile = "3"
 glob-match = "0.2"
 hostname = "0.4"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
