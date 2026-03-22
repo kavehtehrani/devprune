@@ -4,12 +4,13 @@ pub mod status_bar;
 pub mod theme;
 pub mod tree;
 
+use bytesize::ByteSize;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, Widget},
 };
 
 use crate::tui::app::{App, AppMode};
@@ -24,13 +25,14 @@ use crate::tui::ui::{
 pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
     let area = frame.area();
 
-    // ── Main layout: header block | body | footer block ─────────────────
+    // ── Main layout: header | body | trash stats | footer ───────────────
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // header block (border + 1 line + border)
-            Constraint::Min(0),    // body
-            Constraint::Length(1), // footer (single line with top border)
+            Constraint::Length(3), // header block
+            Constraint::Min(0),    // body (tree + details)
+            Constraint::Length(3), // trash stats block
+            Constraint::Length(3), // footer block
         ])
         .split(area);
 
@@ -49,20 +51,18 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
         .split(main_chunks[1]);
 
-    // Build the artifacts block title and optional bottom title for filter status.
-    let tree_title = " artifacts ".to_string();
-    let mut bottom_parts: Vec<Span> = Vec::new();
-    if app.tree.safety_filter.is_active() {
-        let safety_color = match app.tree.safety_filter {
-            crate::tui::app::SafetyFilter::Safe => theme::safety_color(devprune_core::rules::types::SafetyLevel::Safe),
-            crate::tui::app::SafetyFilter::Cautious => theme::safety_color(devprune_core::rules::types::SafetyLevel::Cautious),
-            crate::tui::app::SafetyFilter::Risky => theme::safety_color(devprune_core::rules::types::SafetyLevel::Risky),
-            crate::tui::app::SafetyFilter::All => theme::FOOTER_FG,
-        };
-        bottom_parts.push(Span::styled(" showing: ", Style::default().fg(theme::DIMMED)));
-        bottom_parts.push(Span::styled(app.tree.safety_filter.label(), Style::default().fg(safety_color)));
-        bottom_parts.push(Span::raw(" "));
-    }
+    // Build the artifacts block bottom title for filter/search/status.
+    let safety_color = match app.tree.safety_filter {
+        crate::tui::app::SafetyFilter::Safe => theme::safety_color(devprune_core::rules::types::SafetyLevel::Safe),
+        crate::tui::app::SafetyFilter::Cautious => theme::safety_color(devprune_core::rules::types::SafetyLevel::Cautious),
+        crate::tui::app::SafetyFilter::Risky => theme::safety_color(devprune_core::rules::types::SafetyLevel::Risky),
+        crate::tui::app::SafetyFilter::All => theme::FOOTER_FG,
+    };
+    let mut bottom_parts: Vec<Span> = vec![
+        Span::styled(" filter: ", Style::default().fg(theme::DIMMED)),
+        Span::styled(app.tree.safety_filter.label(), Style::default().fg(safety_color)),
+        Span::raw(" "),
+    ];
     if let Some(ref q) = app.tree.search_filter {
         bottom_parts.push(Span::styled(" search: ", Style::default().fg(theme::DIMMED)));
         bottom_parts.push(Span::styled(format!("\"{}\"", q), Style::default().fg(theme::SPINNER_FG)));
@@ -75,8 +75,8 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
     frame.render_stateful_widget(
         TreeWidget {
             tree: &app.tree,
-            title: &tree_title,
-            bottom_title: if bottom_parts.is_empty() { None } else { Some(Line::from(bottom_parts)) },
+            title: " artifacts ",
+            bottom_title: Some(Line::from(bottom_parts)),
         },
         body_chunks[0],
         tree_state,
@@ -88,6 +88,26 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         },
         body_chunks[1],
     );
+
+    // ── Trash stats block ───────────────────────────────────────────────
+    let trash_info = if app.trash_stats.item_count > 0 {
+        format!(
+            " {} item{}, {} ",
+            app.trash_stats.item_count,
+            if app.trash_stats.item_count == 1 { "" } else { "s" },
+            ByteSize(app.trash_stats.total_bytes),
+        )
+    } else {
+        " empty ".to_string()
+    };
+    let trash_block = Block::default()
+        .title(" trash ")
+        .title_bottom(Line::from(vec![
+            Span::styled(trash_info, Style::default().fg(theme::DIMMED)),
+        ]))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::BORDER));
+    frame.render_widget(trash_block, main_chunks[2]);
 
     // ── Footer block ────────────────────────────────────────────────────
     let hints = status_bar::mode_hints(&app.mode);
@@ -103,9 +123,11 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         })
         .collect();
 
-    let footer_line = Line::from(hint_spans);
-    use ratatui::widgets::Widget;
-    footer_line.render(main_chunks[2], frame.buffer_mut());
+    let footer_block = Block::default()
+        .title(Line::from(hint_spans))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::BORDER));
+    frame.render_widget(footer_block, main_chunks[2 + 1]);
 
     // ── Overlay dialogs ─────────────────────────────────────────────────
     match &app.mode {
@@ -121,12 +143,15 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         AppMode::Normal | AppMode::Search { .. } => {}
     }
 
-    // ── Search overlay ──────────────────────────────────────────────────
+    // ── Search overlay (replaces footer) ────────────────────────────────
     if let AppMode::Search { query } = &app.mode {
         let prompt = format!(" search: / {query}_ ");
-        let search_line = Line::from(vec![
-            Span::styled(prompt, Style::default().fg(theme::FOOTER_KEY_FG)),
-        ]);
-        search_line.render(main_chunks[2], frame.buffer_mut());
+        let search_block = Block::default()
+            .title(Line::from(vec![
+                Span::styled(prompt, Style::default().fg(theme::FOOTER_KEY_FG)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme::FOOTER_KEY_FG));
+        frame.render_widget(search_block, main_chunks[3]);
     }
 }

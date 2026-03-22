@@ -204,6 +204,7 @@ fn perform_trash_delete(app: &mut App) {
     }
 
     app.tree.remove_checked();
+    app.refresh_trash_stats();
 
     let msg = if errors == 0 {
         format!("Deleted {} item{}, freed {}", trashed, if trashed == 1 { "" } else { "s" }, ByteSize(freed))
@@ -246,7 +247,7 @@ fn perform_trash_restore(app: &mut App) {
         }
     }
 
-    // Reload the browser after the operation.
+    app.refresh_trash_stats();
     open_trash_browser(app);
 
     let msg = if errors == 0 {
@@ -282,7 +283,7 @@ fn perform_trash_purge(app: &mut App) {
         }
     }
 
-    // Reload the browser after the operation.
+    app.refresh_trash_stats();
     open_trash_browser(app);
 
     let msg = if errors == 0 {

@@ -629,10 +629,27 @@ pub struct App {
     pub trash_manager: Option<TrashManager>,
     /// State for the trash browser overlay.
     pub trash_browser: TrashBrowserState,
+    /// Cached trash stats (item count, total bytes).
+    pub trash_stats: TrashStats,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TrashStats {
+    pub item_count: usize,
+    pub total_bytes: u64,
 }
 
 impl App {
     pub fn new(app_paths: AppPaths, trash_manager: Option<TrashManager>) -> Self {
+        let trash_stats = trash_manager
+            .as_ref()
+            .and_then(|tm| tm.list_items().ok())
+            .map(|items| TrashStats {
+                item_count: items.len(),
+                total_bytes: items.iter().map(|i| i.size_bytes).sum(),
+            })
+            .unwrap_or_default();
+
         Self {
             tree: TreeState::default(),
             mode: AppMode::Normal,
@@ -645,7 +662,21 @@ impl App {
             status_message: None,
             trash_manager,
             trash_browser: TrashBrowserState::default(),
+            trash_stats,
         }
+    }
+
+    /// Refresh cached trash stats from the trash manager.
+    pub fn refresh_trash_stats(&mut self) {
+        self.trash_stats = self
+            .trash_manager
+            .as_ref()
+            .and_then(|tm| tm.list_items().ok())
+            .map(|items| TrashStats {
+                item_count: items.len(),
+                total_bytes: items.iter().map(|i| i.size_bytes).sum(),
+            })
+            .unwrap_or_default();
     }
 
     pub fn on_tick(&mut self) {
