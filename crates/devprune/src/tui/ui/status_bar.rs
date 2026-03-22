@@ -109,19 +109,26 @@ impl<'a> Widget for Footer<'a> {
             }
         }
 
-        // Line 1: sort / filter status.
-        let sort_label = self.app.tree.sort.label();
-        let filter_label = self.app.tree.search_filter.as_deref().unwrap_or("");
-        let status_line = if filter_label.is_empty() {
-            format!(" sort:{sort_label} ")
+        // Line 1: sort / filter status, or a transient status message.
+        let line1_content = if let Some(ref msg) = self.app.status_message {
+            Line::from(vec![Span::styled(
+                format!(" {msg} "),
+                Style::default().fg(theme::COMPLETE_FG),
+            )])
         } else {
-            format!(" sort:{sort_label}  filter:\"{filter_label}\" ")
+            let sort_label = self.app.tree.sort.label();
+            let filter_label = self.app.tree.search_filter.as_deref().unwrap_or("");
+            let status_line = if filter_label.is_empty() {
+                format!(" sort:{sort_label} ")
+            } else {
+                format!(" sort:{sort_label}  filter:\"{filter_label}\" ")
+            };
+            Line::from(vec![Span::styled(
+                status_line,
+                Style::default().fg(theme::FOOTER_FG),
+            )])
         };
-        Line::from(vec![Span::styled(
-            status_line,
-            Style::default().fg(theme::FOOTER_FG),
-        )])
-        .render(Rect::new(area.x, area.y, area.width, 1), buf);
+        line1_content.render(Rect::new(area.x, area.y, area.width, 1), buf);
 
         if area.height < 2 {
             return;

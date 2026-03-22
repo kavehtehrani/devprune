@@ -12,6 +12,7 @@ use crossterm::{
 use devprune_core::config::AppPaths;
 use devprune_core::rules::types::Rule;
 use devprune_core::scanner::ScanCoordinator;
+use devprune_core::trash::storage::TrashManager;
 use devprune_core::types::{ScanConfig, ScanEvent};
 use ratatui::{Terminal, backend::CrosstermBackend};
 
@@ -35,8 +36,11 @@ pub fn run_tui(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths) -> any
     let coordinator = ScanCoordinator::new(config, rules, app_paths.clone());
     let scan_rx = coordinator.start();
 
+    // ── Trash manager ─────────────────────────────────────────────────────
+    let trash_manager = TrashManager::new(app_paths.clone()).ok();
+
     // ── App state ─────────────────────────────────────────────────────────
-    let mut app = App::new(app_paths);
+    let mut app = App::new(app_paths, trash_manager);
     let mut tree_state = TreeWidgetState::default();
 
     // ── Event loop ────────────────────────────────────────────────────────

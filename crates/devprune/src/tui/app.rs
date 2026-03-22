@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use devprune_core::config::AppPaths;
 use devprune_core::rules::types::Category;
+use devprune_core::trash::metadata::TrashManifestEntry;
+use devprune_core::trash::storage::TrashManager;
 use devprune_core::types::ArtifactInfo;
 use uuid::Uuid;
 
@@ -515,10 +517,16 @@ pub struct App {
     pub tick_count: u64,
     /// Non-fatal scan warnings.
     pub scan_errors: Vec<String>,
+    /// Brief status message shown after an operation completes.
+    pub status_message: Option<String>,
+    /// Trash manager for moving items to the devprune trash.
+    pub trash_manager: Option<TrashManager>,
+    /// State for the trash browser overlay.
+    pub trash_browser: TrashBrowserState,
 }
 
 impl App {
-    pub fn new(app_paths: AppPaths) -> Self {
+    pub fn new(app_paths: AppPaths, trash_manager: Option<TrashManager>) -> Self {
         Self {
             tree: TreeState::default(),
             mode: AppMode::Normal,
@@ -528,11 +536,59 @@ impl App {
             app_paths,
             tick_count: 0,
             scan_errors: Vec::new(),
+            status_message: None,
+            trash_manager,
+            trash_browser: TrashBrowserState::default(),
         }
     }
 
     pub fn on_tick(&mut self) {
         self.tick_count = self.tick_count.wrapping_add(1);
+    }
+}
+
+// ── TrashBrowserState ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Default)]
+pub struct TrashBrowserState {
+    pub items: Vec<TrashManifestEntry>,
+    pub cursor: usize,
+    pub checked: Vec<bool>,
+}
+
+impl TrashBrowserState {
+    pub fn load(&mut self, items: Vec<TrashManifestEntry>) {
+        let len = items.len();
+        self.items = items;
+        self.checked = vec![false; len];
+        self.cursor = 0;
+    }
+
+    pub fn move_cursor(&mut self, delta: i64) {
+        let count = self.items.len();
+        if count == 0 {
+            return;
+        }
+        if delta > 0 {
+            self.cursor = (self.cursor + delta as usize).min(count - 1);
+        } else {
+            self.cursor = self.cursor.saturating_sub((-delta) as usize);
+        }
+    }
+
+    pub fn toggle_check(&mut self) {
+        if let Some(v) = self.checked.get_mut(self.cursor) {
+            *v = !*v;
+        }
+    }
+
+    pub fn selected_ids(&self) -> Vec<uuid::Uuid> {
+        self.items
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.checked.get(*i).copied().unwrap_or(false))
+            .map(|(_, e)| e.id)
+            .collect()
     }
 }
 
