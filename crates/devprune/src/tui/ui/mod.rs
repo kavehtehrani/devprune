@@ -30,7 +30,7 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         .constraints([
             Constraint::Length(3), // header block (border + 1 line + border)
             Constraint::Min(0),    // body
-            Constraint::Length(3), // footer block
+            Constraint::Length(1), // footer (single line with top border)
         ])
         .split(area);
 
@@ -103,11 +103,9 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         })
         .collect();
 
-    let footer_block = Block::default()
-        .title(Line::from(hint_spans))
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme::BORDER));
-    frame.render_widget(footer_block, main_chunks[2]);
+    let footer_line = Line::from(hint_spans);
+    use ratatui::widgets::Widget;
+    footer_line.render(main_chunks[2], frame.buffer_mut());
 
     // ── Overlay dialogs ─────────────────────────────────────────────────
     match &app.mode {
@@ -129,10 +127,6 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         let search_line = Line::from(vec![
             Span::styled(prompt, Style::default().fg(theme::FOOTER_KEY_FG)),
         ]);
-        let search_block = Block::default()
-            .title(search_line)
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme::FOOTER_KEY_FG));
-        frame.render_widget(search_block, main_chunks[2]);
+        search_line.render(main_chunks[2], frame.buffer_mut());
     }
 }

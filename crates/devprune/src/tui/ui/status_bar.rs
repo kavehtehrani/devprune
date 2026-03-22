@@ -64,9 +64,7 @@ pub fn render_header_content(frame: &mut Frame, area: Rect, app: &App) {
 pub fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
     match mode {
         AppMode::Normal => vec![
-            ("j/k", "move"),
             ("Space", "check"),
-            ("h/l", "collapse/expand"),
             ("a/A", "all/none"),
             ("d", "delete"),
             ("/", "search"),
