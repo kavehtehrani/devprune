@@ -39,15 +39,18 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
         .split(main_chunks[1]);
 
-    // Determine the title suffix for the tree panel (shows active sort / filter).
-    let sort_label = app.tree.sort.label();
-    let safety_label = app.tree.safety_filter.label();
-    let tree_title = if let Some(ref q) = app.tree.search_filter {
-        format!(" Artifacts [sort:{sort_label}  safety:{safety_label}  filter:\"{q}\"] ")
-    } else if app.tree.safety_filter != crate::tui::app::SafetyFilter::All {
-        format!(" Artifacts [sort:{sort_label}  safety:{safety_label}] ")
+    // Build the tree panel title showing active filters.
+    let mut title_parts: Vec<String> = Vec::new();
+    if app.tree.safety_filter.is_active() {
+        title_parts.push(format!("showing: {}", app.tree.safety_filter.label()));
+    }
+    if let Some(ref q) = app.tree.search_filter {
+        title_parts.push(format!("search: \"{}\"", q));
+    }
+    let tree_title = if title_parts.is_empty() {
+        " Artifacts ".to_string()
     } else {
-        format!(" Artifacts [sort:{sort_label}] ")
+        format!(" Artifacts [{}] ", title_parts.join(" | "))
     };
 
     frame.render_stateful_widget(

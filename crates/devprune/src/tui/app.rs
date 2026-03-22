@@ -58,11 +58,15 @@ impl SafetyFilter {
 
     pub fn label(self) -> &'static str {
         match self {
-            SafetyFilter::All => "all",
-            SafetyFilter::Safe => "safe",
-            SafetyFilter::Cautious => "cautious",
-            SafetyFilter::Risky => "risky",
+            SafetyFilter::All => "All",
+            SafetyFilter::Safe => "Safe only",
+            SafetyFilter::Cautious => "Cautious only",
+            SafetyFilter::Risky => "Risky only",
         }
+    }
+
+    pub fn is_active(self) -> bool {
+        !matches!(self, SafetyFilter::All)
     }
 
     /// Returns true when the given safety level should be visible under this
