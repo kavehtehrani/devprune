@@ -16,6 +16,7 @@ log = { workspace = true }
 ignore = { workspace = true }
 rayon = { workspace = true }
 glob-match = { workspace = true }
+hostname = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

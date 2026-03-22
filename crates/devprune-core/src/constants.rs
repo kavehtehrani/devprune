@@ -5,6 +5,7 @@ pub const DEFAULT_TICK_RATE_MS: u64 = 100;
 pub const DEFAULT_AUTO_PURGE_DAYS: u64 = 30;
 
 pub const MANIFEST_FILENAME: &str = "manifest.json";
+pub const MANIFEST_VERSION: u32 = 1;
 pub const METADATA_FILENAME: &str = "metadata.json";
 pub const CONTENT_DIRNAME: &str = "content";
 pub const TRASH_DIRNAME: &str = "trash";
