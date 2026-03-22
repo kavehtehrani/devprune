@@ -1,5 +1,6 @@
 use bytesize::ByteSize;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use uuid::Uuid;
 
 use super::app::{App, AppMode};
 
@@ -7,9 +8,12 @@ use super::app::{App, AppMode};
 pub fn handle_input(app: &mut App, event: Event) {
     let Event::Key(key) = event else { return };
 
-    match &app.mode.clone() {
+    match &app.mode {
         AppMode::Normal => handle_normal(app, key),
-        AppMode::Search { query } => handle_search(app, key, query.clone()),
+        AppMode::Search { query } => {
+            let query = query.clone(); // only clone the string we need
+            handle_search(app, key, query);
+        }
         AppMode::ConfirmDelete => handle_confirm_delete(app, key),
         AppMode::ConfirmQuit => handle_confirm_quit(app, key),
         AppMode::Help => handle_help(app, key),
@@ -204,6 +208,50 @@ fn handle_trash_browser(app: &mut App, key: KeyEvent) {
 
 // ── Trash operations ──────────────────────────────────────────────────────────
 
+/// Returns `""` when `count` is 1, otherwise `"s"`.
+fn plural(count: usize) -> &'static str {
+    if count == 1 { "" } else { "s" }
+}
+
+/// Shared helper for trash manager operations that iterate over a list of IDs,
+/// call a per-item function, track success/error counts, then refresh stats.
+///
+/// `items` is the list of IDs to process. `op` is called for each ID and
+/// returns a `Result`. `post_refresh` is called after all items are processed
+/// (e.g. to reload the trash browser). Returns `(success_count, error_count)`.
+fn run_trash_op<F, P>(
+    app: &mut App,
+    items: Vec<Uuid>,
+    mut op: F,
+    post_refresh: P,
+) -> (usize, usize)
+where
+    F: FnMut(&devprune_core::trash::storage::TrashManager, Uuid) -> devprune_core::error::Result<()>,
+    P: FnOnce(&mut App),
+{
+    let Some(ref trash_manager) = app.trash_manager else {
+        app.set_status_message("Trash unavailable".to_string());
+        return (0, 0);
+    };
+
+    let mut ok = 0usize;
+    let mut err = 0usize;
+
+    for id in items {
+        match op(trash_manager, id) {
+            Ok(()) => ok += 1,
+            Err(e) => {
+                log::warn!("trash op failed for {id}: {e}");
+                err += 1;
+            }
+        }
+    }
+
+    app.refresh_trash_stats();
+    post_refresh(app);
+    (ok, err)
+}
+
 /// Move all checked artifacts to the devprune trash, then remove them from the
 /// tree and show a status message.
 fn perform_trash_delete(app: &mut App) {
@@ -216,7 +264,7 @@ fn perform_trash_delete(app: &mut App) {
     let Some(ref trash_manager) = app.trash_manager else {
         // No trash manager available – fall back to just removing from tree.
         app.tree.remove_checked();
-        app.status_message = Some("Removed from view (trash unavailable)".to_string());
+        app.set_status_message("Removed from view (trash unavailable)".to_string());
         return;
     };
 
@@ -246,18 +294,18 @@ fn perform_trash_delete(app: &mut App) {
     app.refresh_trash_stats();
 
     let msg = if errors == 0 {
-        format!("Deleted {} item{}, freed {}", trashed, if trashed == 1 { "" } else { "s" }, ByteSize(freed))
+        format!("Deleted {} item{}, freed {}", trashed, plural(trashed), ByteSize(freed))
     } else {
         format!(
             "Deleted {} item{}, freed {} ({} error{})",
             trashed,
-            if trashed == 1 { "" } else { "s" },
+            plural(trashed),
             ByteSize(freed),
             errors,
-            if errors == 1 { "" } else { "s" },
+            plural(errors),
         )
     };
-    app.status_message = Some(msg);
+    app.set_status_message(msg);
 }
 
 /// Restore all checked items in the trash browser back to their original
@@ -268,33 +316,19 @@ fn perform_trash_restore(app: &mut App) {
         return;
     }
 
-    let Some(ref trash_manager) = app.trash_manager else {
-        app.status_message = Some("Trash unavailable".to_string());
-        return;
-    };
-
-    let mut restored = 0usize;
-    let mut errors = 0usize;
-
-    for id in ids {
-        match trash_manager.restore_item(id) {
-            Ok(_) => restored += 1,
-            Err(e) => {
-                log::warn!("trash: restore {id} failed: {e}");
-                errors += 1;
-            }
-        }
-    }
-
-    app.refresh_trash_stats();
-    open_trash_browser(app);
+    let (restored, errors) = run_trash_op(
+        app,
+        ids,
+        |tm, id| tm.restore_item(id).map(|_| ()),
+        open_trash_browser,
+    );
 
     let msg = if errors == 0 {
-        format!("Restored {} item{}", restored, if restored == 1 { "" } else { "s" })
+        format!("Restored {} item{}", restored, plural(restored))
     } else {
-        format!("Restored {} item{} ({} failed)", restored, if restored == 1 { "" } else { "s" }, errors)
+        format!("Restored {} item{} ({} failed)", restored, plural(restored), errors)
     };
-    app.status_message = Some(msg);
+    app.set_status_message(msg);
 }
 
 /// Permanently purge all checked items from the trash browser.
@@ -304,33 +338,19 @@ fn perform_trash_purge(app: &mut App) {
         return;
     }
 
-    let Some(ref trash_manager) = app.trash_manager else {
-        app.status_message = Some("Trash unavailable".to_string());
-        return;
-    };
-
-    let mut purged = 0usize;
-    let mut errors = 0usize;
-
-    for id in ids {
-        match trash_manager.purge_item(id) {
-            Ok(()) => purged += 1,
-            Err(e) => {
-                log::warn!("trash: purge {id} failed: {e}");
-                errors += 1;
-            }
-        }
-    }
-
-    app.refresh_trash_stats();
-    open_trash_browser(app);
+    let (purged, errors) = run_trash_op(
+        app,
+        ids,
+        |tm, id| tm.purge_item(id),
+        open_trash_browser,
+    );
 
     let msg = if errors == 0 {
-        format!("Purged {} item{}", purged, if purged == 1 { "" } else { "s" })
+        format!("Purged {} item{}", purged, plural(purged))
     } else {
-        format!("Purged {} item{} ({} failed)", purged, if purged == 1 { "" } else { "s" }, errors)
+        format!("Purged {} item{} ({} failed)", purged, plural(purged), errors)
     };
-    app.status_message = Some(msg);
+    app.set_status_message(msg);
 }
 
 /// Load the trash list and switch to the TrashBrowser mode.

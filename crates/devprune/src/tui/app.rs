@@ -7,6 +7,10 @@ use devprune_core::trash::storage::TrashManager;
 use devprune_core::types::ArtifactInfo;
 use uuid::Uuid;
 
+/// Number of ticks (at 100 ms each) before a status message is auto-dismissed.
+/// 30 ticks = 3 seconds.
+const STATUS_MESSAGE_DISMISS_TICKS: u64 = 30;
+
 // ── Sort / filter state ───────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -108,8 +112,6 @@ pub struct CategoryNode {
 pub struct RuleGroupNode {
     pub rule_id: String,
     pub rule_name: String,
-    #[allow(dead_code)]
-    pub category: Category,
     pub expanded: bool,
     pub check_state: CheckState,
     pub children: Vec<ArtifactNode>,
@@ -196,7 +198,6 @@ impl TreeState {
             let node = RuleGroupNode {
                 rule_id,
                 rule_name,
-                category,
                 expanded: true,
                 check_state: CheckState::Unchecked,
                 children: Vec::new(),
@@ -411,23 +412,6 @@ impl TreeState {
         }
     }
 
-    pub fn toggle_expand(&mut self, cursor: usize) {
-        let rows = self.visible_rows();
-        if cursor >= rows.len() {
-            return;
-        }
-        match rows[cursor].row_ref.clone() {
-            RowRef::Category { cat_idx } => {
-                self.categories[cat_idx].expanded = !self.categories[cat_idx].expanded;
-            }
-            RowRef::RuleGroup { cat_idx, grp_idx } => {
-                self.categories[cat_idx].children[grp_idx].expanded =
-                    !self.categories[cat_idx].children[grp_idx].expanded;
-            }
-            RowRef::Artifact { .. } => {}
-        }
-    }
-
     /// Expand the node at cursor. If already expanded or a leaf, no-op.
     pub fn expand(&mut self, cursor: usize) {
         let rows = self.visible_rows();
@@ -636,6 +620,9 @@ pub struct App {
     pub scan_errors: Vec<String>,
     /// Brief status message shown after an operation completes.
     pub status_message: Option<String>,
+    /// Tick counter incremented each tick while a status message is visible.
+    /// The message is cleared when this reaches STATUS_MESSAGE_DISMISS_TICKS.
+    pub status_message_ticks: u64,
     /// Trash manager for moving items to the devprune trash.
     pub trash_manager: Option<TrashManager>,
     /// State for the trash browser overlay.
@@ -673,6 +660,7 @@ impl App {
             tick_count: 0,
             scan_errors: Vec::new(),
             status_message: None,
+            status_message_ticks: 0,
             trash_manager,
             trash_browser: TrashBrowserState::default(),
             trash_stats,
@@ -687,7 +675,7 @@ impl App {
         self.scan_complete = false;
         self.scan_progress = ScanProgressState::default();
         self.scan_errors.clear();
-        self.status_message = Some("rescanning...".to_string());
+        self.set_status_message("rescanning...".to_string());
         self.mode = AppMode::Normal;
         self.rescan_requested = false;
     }
@@ -705,8 +693,21 @@ impl App {
             .unwrap_or_default();
     }
 
+    /// Set the status bar message and reset its auto-dismiss tick counter.
+    pub fn set_status_message(&mut self, msg: String) {
+        self.status_message = Some(msg);
+        self.status_message_ticks = 0;
+    }
+
     pub fn on_tick(&mut self) {
         self.tick_count = self.tick_count.wrapping_add(1);
+        if self.status_message.is_some() {
+            self.status_message_ticks = self.status_message_ticks.saturating_add(1);
+            if self.status_message_ticks >= STATUS_MESSAGE_DISMISS_TICKS {
+                self.status_message = None;
+                self.status_message_ticks = 0;
+            }
+        }
     }
 }
 

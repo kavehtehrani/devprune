@@ -42,7 +42,7 @@ impl<'a> Widget for DetailsPanel<'a> {
         let size_str = art
             .size
             .map(|s| ByteSize(s).to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .unwrap_or_else(|| "computing...".to_string());
 
         let modified_str = art
             .last_modified
@@ -61,9 +61,10 @@ impl<'a> Widget for DetailsPanel<'a> {
             Span::styled(path_str, Style::default().fg(theme::DIMMED)),
         ]));
 
+        let size_color = if art.size.is_none() { theme::SPINNER_FG } else { theme::SIZE_FG };
         lines.push(Line::from(vec![
             Span::styled("Size:     ", Style::default().fg(theme::DIMMED)),
-            Span::styled(size_str, Style::default().fg(theme::SIZE_FG)),
+            Span::styled(size_str, Style::default().fg(size_color)),
         ]));
 
         lines.push(Line::from(vec![

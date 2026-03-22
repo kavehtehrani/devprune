@@ -16,6 +16,14 @@ pub const MACOS_SKIP_PATHS: &[&str] =
     &["/System", "/Library", "/Volumes", "/private/var/vm"];
 pub const ALWAYS_SKIP_DIRS: &[&str] = &[".git"];
 
+/// errno 18: cross-device rename (EXDEV). Used when detecting that `rename`
+/// failed because source and destination are on different filesystems.
+pub const EXDEV_ERROR_CODE: i32 = 18;
+
+/// Threshold in bytes above which the confirm-delete dialog shows an extra
+/// large-deletion warning (10 GiB).
+pub const LARGE_DELETE_THRESHOLD_BYTES: u64 = 10 * 1024 * 1024 * 1024;
+
 #[cfg(test)]
 mod tests {
     use super::*;

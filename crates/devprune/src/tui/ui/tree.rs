@@ -126,8 +126,15 @@ fn render_row(buf: &mut Buffer, x: u16, y: u16, width: u16, row: &VisibleRow, is
         RowRef::Artifact { .. } => theme::DIMMED,
     };
 
+    // For artifact rows the size starts at 0 while the background worker is
+    // still computing it.  Show a "computing..." placeholder so the user knows
+    // something is in-flight instead of just seeing "?" or "0 B".
+    let is_artifact_row = matches!(row.row_ref, RowRef::Artifact { .. });
+    let size_computing = is_artifact_row && row.size == 0;
     let size_str = if row.size > 0 {
         ByteSize(row.size).to_string()
+    } else if size_computing {
+        "computing...".to_string()
     } else {
         "?".to_string()
     };
@@ -156,8 +163,9 @@ fn render_row(buf: &mut Buffer, x: u16, y: u16, width: u16, row: &VisibleRow, is
         Span::styled(count_str, Style::default().fg(theme::COUNT_FG)),
     ];
 
-    // Right-aligned size.
-    let size_span = Span::styled(size_str.clone(), Style::default().fg(theme::SIZE_FG));
+    // Right-aligned size.  Use the spinner colour when computing so it reads as
+    // a transient/pending value rather than a real measurement.
+    let size_color = if size_computing { theme::SPINNER_FG } else { theme::SIZE_FG };
     let left_line = Line::from(spans);
     let left_text = left_line.to_string();
     let left_width = left_text.len() as u16;
@@ -170,10 +178,9 @@ fn render_row(buf: &mut Buffer, x: u16, y: u16, width: u16, row: &VisibleRow, is
     // Render size right-aligned, only if it fits.
     if width > left_width + size_len {
         let size_x = x + width - size_len;
-        let _ = size_span; // re-create
-        let size_span2 = Span::styled(size_str, Style::default().fg(theme::SIZE_FG));
+        let size_span = Span::styled(size_str, Style::default().fg(size_color));
         let size_area = Rect::new(size_x, y, size_len, 1);
-        Line::from(vec![size_span2]).render(size_area, buf);
+        Line::from(vec![size_span]).render(size_area, buf);
     }
 
     // Apply highlight bg across the full row width (cannot set style before render

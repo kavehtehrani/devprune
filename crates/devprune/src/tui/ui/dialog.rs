@@ -1,4 +1,5 @@
 use bytesize::ByteSize;
+use devprune_core::constants::LARGE_DELETE_THRESHOLD_BYTES;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
@@ -13,8 +14,10 @@ use crate::tui::ui::theme;
 /// Renders a centred dialog box over the current frame.
 pub fn render_confirm_delete(frame_area: Rect, buf: &mut Buffer, app: &App) {
     let (count, size) = app.tree.selection_summary();
+    let is_large_delete = size >= LARGE_DELETE_THRESHOLD_BYTES;
     let dialog_width = 50u16.min(frame_area.width.saturating_sub(4));
-    let dialog_height = 6u16;
+    // Add two extra lines when showing the large-deletion warning.
+    let dialog_height = if is_large_delete { 8u16 } else { 6u16 };
 
     let area = centered_rect(dialog_width, dialog_height, frame_area);
 
@@ -33,11 +36,11 @@ pub fn render_confirm_delete(frame_area: Rect, buf: &mut Buffer, app: &App) {
     let msg = format!(
         "Delete {} item{} ({})?",
         count,
-        if count == 1 { "" } else { "s" },
+        super::plural(count),
         ByteSize(size)
     );
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
             msg,
@@ -45,13 +48,24 @@ pub fn render_confirm_delete(frame_area: Rect, buf: &mut Buffer, app: &App) {
                 .fg(theme::DIALOG_TITLE)
                 .add_modifier(Modifier::BOLD),
         )]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("[y]es", Style::default().fg(theme::FOOTER_KEY_FG)),
-            Span::raw("  /  "),
-            Span::styled("[n]o", Style::default().fg(theme::FOOTER_KEY_FG)),
-        ]),
     ];
+
+    if is_large_delete {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![Span::styled(
+            "warning: this is a large deletion",
+            Style::default()
+                .fg(theme::ERROR_FG)
+                .add_modifier(Modifier::BOLD),
+        )]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("[y]es", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw("  /  "),
+        Span::styled("[n]o", Style::default().fg(theme::FOOTER_KEY_FG)),
+    ]));
 
     Paragraph::new(lines)
         .alignment(Alignment::Center)
@@ -79,7 +93,7 @@ pub fn render_confirm_quit(frame_area: Rect, buf: &mut Buffer, app: &App) {
     let msg = format!(
         "trash is not empty ({} item{}, {})",
         app.trash_stats.item_count,
-        if app.trash_stats.item_count == 1 { "" } else { "s" },
+        super::plural(app.trash_stats.item_count),
         ByteSize(app.trash_stats.total_bytes),
     );
 
@@ -181,7 +195,7 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
     let title = format!(
         " trash ({} item{}, {}) ",
         state.items.len(),
-        if state.items.len() == 1 { "" } else { "s" },
+        super::plural(state.items.len()),
         state.sort.label(),
     );
     let hint_line = Line::from(vec![
