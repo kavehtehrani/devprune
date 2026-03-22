@@ -4,9 +4,10 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
+    widgets::{
+        Block, Borders, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget,
+    },
 };
-
 
 use crate::tui::app::{CheckState, RowRef, TreeState, VisibleRow};
 use crate::tui::ui::theme;
@@ -73,8 +74,7 @@ impl<'a> StatefulWidget for TreeWidget<'a> {
         // Scrollbar (only when content overflows).
         let total_rows = rows.len();
         if total_rows > visible_height {
-            let mut scrollbar_state = ScrollbarState::new(total_rows)
-                .position(state.offset);
+            let mut scrollbar_state = ScrollbarState::new(total_rows).position(state.offset);
             Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(None)
                 .end_symbol(None)
@@ -165,7 +165,11 @@ fn render_row(buf: &mut Buffer, x: u16, y: u16, width: u16, row: &VisibleRow, is
 
     // Right-aligned size.  Use the spinner colour when computing so it reads as
     // a transient/pending value rather than a real measurement.
-    let size_color = if size_computing { theme::SPINNER_FG } else { theme::SIZE_FG };
+    let size_color = if size_computing {
+        theme::SPINNER_FG
+    } else {
+        theme::SIZE_FG
+    };
     let left_line = Line::from(spans);
     let left_text = left_line.to_string();
     let left_width = left_text.len() as u16;

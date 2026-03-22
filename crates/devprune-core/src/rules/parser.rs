@@ -66,10 +66,9 @@ pub fn load_user_rules(config_dir: &Path, mut builtin: Vec<Rule>) -> Result<Vec<
     }
 
     let raw = std::fs::read_to_string(&config_path)?;
-    let config: UserConfig =
-        toml::from_str(&raw).map_err(|e| DevpruneError::RuleConfig {
-            message: format!("failed to parse {}: {e}", config_path.display()),
-        })?;
+    let config: UserConfig = toml::from_str(&raw).map_err(|e| DevpruneError::RuleConfig {
+        message: format!("failed to parse {}: {e}", config_path.display()),
+    })?;
 
     // Disable built-in rules by ID.
     for id in &config.rules.disable.ids {
@@ -311,10 +310,25 @@ match_condition = { type = "FileExtension", value = "class" }
         );
         let result = load_user_rules(tmp.path(), vec![]).unwrap();
         assert_eq!(result.len(), 5);
-        assert!(matches!(result[0].match_condition, MatchCondition::DirName(_)));
-        assert!(matches!(result[1].match_condition, MatchCondition::DirGlob(_)));
-        assert!(matches!(result[2].match_condition, MatchCondition::FileName(_)));
-        assert!(matches!(result[3].match_condition, MatchCondition::FileGlob(_)));
-        assert!(matches!(result[4].match_condition, MatchCondition::FileExtension(_)));
+        assert!(matches!(
+            result[0].match_condition,
+            MatchCondition::DirName(_)
+        ));
+        assert!(matches!(
+            result[1].match_condition,
+            MatchCondition::DirGlob(_)
+        ));
+        assert!(matches!(
+            result[2].match_condition,
+            MatchCondition::FileName(_)
+        ));
+        assert!(matches!(
+            result[3].match_condition,
+            MatchCondition::FileGlob(_)
+        ));
+        assert!(matches!(
+            result[4].match_condition,
+            MatchCondition::FileExtension(_)
+        ));
     }
 }

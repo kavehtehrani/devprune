@@ -134,7 +134,10 @@ mod tests {
     #[test]
     fn category_display_names_not_empty() {
         for cat in Category::all() {
-            assert!(!cat.display_name().is_empty(), "{cat:?} has empty display name");
+            assert!(
+                !cat.display_name().is_empty(),
+                "{cat:?} has empty display name"
+            );
         }
     }
 

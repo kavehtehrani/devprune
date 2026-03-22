@@ -14,6 +14,7 @@ pub fn handle_input(app: &mut App, event: Event) {
             let query = query.clone(); // only clone the string we need
             handle_search(app, key, query);
         }
+        AppMode::ChangePath => handle_change_path(app, key),
         AppMode::ConfirmDelete => handle_confirm_delete(app, key),
         AppMode::ConfirmQuit => handle_confirm_quit(app, key),
         AppMode::Help => handle_help(app, key),
@@ -49,6 +50,11 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         KeyCode::Char('a') => app.tree.select_all(true),
         KeyCode::Char('A') => app.tree.select_all(false),
 
+        // Change directory (Ctrl+C is handled separately below)
+        KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            open_fs_browser(app);
+        }
+
         // Delete
         KeyCode::Char('d') => {
             let (count, _) = app.tree.selection_summary();
@@ -59,7 +65,9 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
 
         // Search
         KeyCode::Char('/') => {
-            app.mode = AppMode::Search { query: String::new() };
+            app.mode = AppMode::Search {
+                query: String::new(),
+            };
             app.tree.search_filter = None;
         }
 
@@ -123,6 +131,47 @@ fn handle_search(app: &mut App, key: KeyEvent, mut query: String) {
         }
         _ => {}
     }
+}
+
+fn handle_change_path(app: &mut App, key: KeyEvent) {
+    match key.code {
+        // Navigation
+        KeyCode::Down => app.fs_browser.move_cursor(1),
+        KeyCode::Up => app.fs_browser.move_cursor(-1),
+        KeyCode::PageDown => app.fs_browser.move_cursor(10),
+        KeyCode::PageUp => app.fs_browser.move_cursor(-10),
+
+        // Navigate into directory / go up
+        KeyCode::Right => app.fs_browser.enter_selected(),
+        KeyCode::Left | KeyCode::Backspace => app.fs_browser.go_up(),
+
+        // Confirm: use current directory as scan target
+        KeyCode::Enter => {
+            app.pending_path_change = Some(app.fs_browser.selected_path());
+            app.mode = AppMode::Normal;
+        }
+
+        // Toggle hidden directories
+        KeyCode::Char('.') => app.fs_browser.toggle_hidden(),
+
+        // Cancel
+        KeyCode::Esc => {
+            app.mode = AppMode::Normal;
+        }
+
+        _ => {}
+    }
+}
+
+/// Load the filesystem browser and switch to ChangePath mode.
+fn open_fs_browser(app: &mut App) {
+    let initial_dir = app
+        .scan_paths
+        .first()
+        .cloned()
+        .unwrap_or_else(|| std::path::PathBuf::from("/"));
+    app.fs_browser.load(initial_dir);
+    app.mode = AppMode::ChangePath;
 }
 
 fn handle_confirm_delete(app: &mut App, key: KeyEvent) {
@@ -225,14 +274,12 @@ fn plural(count: usize) -> &'static str {
 /// `items` is the list of IDs to process. `op` is called for each ID and
 /// returns a `Result`. `post_refresh` is called after all items are processed
 /// (e.g. to reload the trash browser). Returns `(success_count, error_count)`.
-fn run_trash_op<F, P>(
-    app: &mut App,
-    items: Vec<Uuid>,
-    mut op: F,
-    post_refresh: P,
-) -> (usize, usize)
+fn run_trash_op<F, P>(app: &mut App, items: Vec<Uuid>, mut op: F, post_refresh: P) -> (usize, usize)
 where
-    F: FnMut(&devprune_core::trash::storage::TrashManager, Uuid) -> devprune_core::error::Result<()>,
+    F: FnMut(
+        &devprune_core::trash::storage::TrashManager,
+        Uuid,
+    ) -> devprune_core::error::Result<()>,
     P: FnOnce(&mut App),
 {
     let Some(ref trash_manager) = app.trash_manager else {
@@ -261,7 +308,12 @@ where
 /// Move all checked artifacts to the devprune trash, then remove them from the
 /// tree and show a status message.
 fn perform_trash_delete(app: &mut App) {
-    let selected = app.tree.selected_artifacts().into_iter().cloned().collect::<Vec<_>>();
+    let selected = app
+        .tree
+        .selected_artifacts()
+        .into_iter()
+        .cloned()
+        .collect::<Vec<_>>();
     if selected.is_empty() {
         app.tree.remove_checked();
         return;
@@ -300,7 +352,12 @@ fn perform_trash_delete(app: &mut App) {
     app.refresh_trash_stats();
 
     let msg = if errors == 0 {
-        format!("Deleted {} item{}, freed {}", trashed, plural(trashed), ByteSize(freed))
+        format!(
+            "Deleted {} item{}, freed {}",
+            trashed,
+            plural(trashed),
+            ByteSize(freed)
+        )
     } else {
         format!(
             "Deleted {} item{}, freed {} ({} error{})",
@@ -332,7 +389,12 @@ fn perform_trash_restore(app: &mut App) {
     let msg = if errors == 0 {
         format!("Restored {} item{}", restored, plural(restored))
     } else {
-        format!("Restored {} item{} ({} failed)", restored, plural(restored), errors)
+        format!(
+            "Restored {} item{} ({} failed)",
+            restored,
+            plural(restored),
+            errors
+        )
     };
     app.set_status_message(msg);
 }
@@ -344,17 +406,17 @@ fn perform_trash_purge(app: &mut App) {
         return;
     }
 
-    let (purged, errors) = run_trash_op(
-        app,
-        ids,
-        |tm, id| tm.purge_item(id),
-        open_trash_browser,
-    );
+    let (purged, errors) = run_trash_op(app, ids, |tm, id| tm.purge_item(id), open_trash_browser);
 
     let msg = if errors == 0 {
         format!("Purged {} item{}", purged, plural(purged))
     } else {
-        format!("Purged {} item{} ({} failed)", purged, plural(purged), errors)
+        format!(
+            "Purged {} item{} ({} failed)",
+            purged,
+            plural(purged),
+            errors
+        )
     };
     app.set_status_message(msg);
 }

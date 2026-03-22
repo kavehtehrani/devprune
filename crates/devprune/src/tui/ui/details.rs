@@ -1,10 +1,10 @@
 use bytesize::ByteSize;
 use ratatui::{
+    buffer::Buffer,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
-    buffer::Buffer,
 };
 
 use devprune_core::types::ArtifactInfo;
@@ -61,7 +61,11 @@ impl<'a> Widget for DetailsPanel<'a> {
             Span::styled(path_str, Style::default().fg(theme::DIMMED)),
         ]));
 
-        let size_color = if art.size.is_none() { theme::SPINNER_FG } else { theme::SIZE_FG };
+        let size_color = if art.size.is_none() {
+            theme::SPINNER_FG
+        } else {
+            theme::SIZE_FG
+        };
         lines.push(Line::from(vec![
             Span::styled("Size:     ", Style::default().fg(theme::DIMMED)),
             Span::styled(size_str, Style::default().fg(size_color)),
@@ -77,7 +81,10 @@ impl<'a> Widget for DetailsPanel<'a> {
 
         lines.push(Line::from(vec![
             Span::styled("Rule:     ", Style::default().fg(theme::DIMMED)),
-            Span::styled(art.rule_name.clone(), Style::default().fg(theme::FOREGROUND)),
+            Span::styled(
+                art.rule_name.clone(),
+                Style::default().fg(theme::FOREGROUND),
+            ),
         ]));
 
         lines.push(Line::from(vec![
@@ -107,12 +114,6 @@ impl<'a> Widget for DetailsPanel<'a> {
                 Style::default().fg(theme::FOREGROUND),
             )]));
         }
-
-        lines.push(Line::from(""));
-        lines.push(Line::from(vec![Span::styled(
-            "Space: toggle  d: delete",
-            Style::default().fg(theme::FOOTER_KEY_FG),
-        )]));
 
         let para = Paragraph::new(lines).wrap(Wrap { trim: true });
         para.render(inner, buf);

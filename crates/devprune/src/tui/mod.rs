@@ -23,7 +23,11 @@ use crate::tui::{
     ui::{draw, tree::TreeWidgetState},
 };
 
-pub fn run_tui(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths) -> anyhow::Result<()> {
+pub fn run_tui(
+    mut config: ScanConfig,
+    rules: Vec<Rule>,
+    app_paths: AppPaths,
+) -> anyhow::Result<()> {
     // ── Set up terminal ───────────────────────────────────────────────────
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -36,7 +40,7 @@ pub fn run_tui(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths) -> any
     let trash_manager = TrashManager::new(app_paths.clone()).ok();
 
     // ── App state ─────────────────────────────────────────────────────────
-    let mut app = App::new(app_paths.clone(), trash_manager);
+    let mut app = App::new(app_paths.clone(), trash_manager, config.paths.clone());
     let mut tree_state = TreeWidgetState::default();
 
     // ── Start initial scan ────────────────────────────────────────────────
@@ -58,10 +62,17 @@ pub fn run_tui(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths) -> any
             break Ok(());
         }
 
+        if let Some(new_path) = app.pending_path_change.take() {
+            config.paths = vec![new_path.clone()];
+            app.scan_paths = vec![new_path];
+            app.rescan_requested = true;
+        }
+
         if app.rescan_requested {
             app.reset_for_rescan();
             tree_state = TreeWidgetState::default();
-            let coordinator = ScanCoordinator::new(config.clone(), rules.clone(), app_paths.clone());
+            let coordinator =
+                ScanCoordinator::new(config.clone(), rules.clone(), app_paths.clone());
             scan_rx = coordinator.start();
         }
     };

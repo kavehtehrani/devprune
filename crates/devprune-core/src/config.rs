@@ -50,10 +50,7 @@ impl AppPaths {
             crate::constants::LINUX_SKIP_PATHS
         };
 
-        let mut paths: Vec<PathBuf> = platform_paths
-            .iter()
-            .map(|s| PathBuf::from(s))
-            .collect();
+        let mut paths: Vec<PathBuf> = platform_paths.iter().map(|s| PathBuf::from(s)).collect();
 
         paths.push(self.trash_dir.clone());
         paths

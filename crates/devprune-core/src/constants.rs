@@ -12,8 +12,7 @@ pub const TRASH_DIRNAME: &str = "trash";
 pub const ITEMS_DIRNAME: &str = "items";
 
 pub const LINUX_SKIP_PATHS: &[&str] = &["/proc", "/sys", "/dev", "/run", "/tmp", "/snap"];
-pub const MACOS_SKIP_PATHS: &[&str] =
-    &["/System", "/Library", "/Volumes", "/private/var/vm"];
+pub const MACOS_SKIP_PATHS: &[&str] = &["/System", "/Library", "/Volumes", "/private/var/vm"];
 pub const ALWAYS_SKIP_DIRS: &[&str] = &[".git"];
 
 /// errno 18: cross-device rename (EXDEV). Used when detecting that `rename`

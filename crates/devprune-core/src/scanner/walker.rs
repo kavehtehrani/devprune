@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
 use chrono::{DateTime, Utc};
@@ -46,12 +46,7 @@ impl ScanCoordinator {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-fn run_scan(
-    config: ScanConfig,
-    rules: Vec<Rule>,
-    app_paths: AppPaths,
-    tx: Sender<ScanEvent>,
-) {
+fn run_scan(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths, tx: Sender<ScanEvent>) {
     let start = Instant::now();
     let dirs_visited = Arc::new(AtomicU64::new(0));
     let artifacts_found = Arc::new(AtomicU64::new(0));
@@ -226,11 +221,7 @@ pub fn compute_dir_size(path: &Path) -> u64 {
         .collect::<Result<Vec<_>, _>>()
     {
         for entry in walker {
-            if entry
-                .file_type()
-                .map(|ft| ft.is_file())
-                .unwrap_or(false)
-            {
+            if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
                 if let Ok(meta) = entry.metadata() {
                     total += meta.len();
                 }
@@ -287,15 +278,12 @@ mod tests {
             paths: vec![tmp.path().to_path_buf()],
             ..Default::default()
         };
-        let coordinator =
-            ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
+        let coordinator = ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
         let rx = coordinator.start();
         let found = collect_events(rx);
 
         assert!(
-            found.iter().any(|a| a
-                .path
-                .ends_with("node_modules")),
+            found.iter().any(|a| a.path.ends_with("node_modules")),
             "expected node_modules to be found, got: {:?}",
             found.iter().map(|a| &a.path).collect::<Vec<_>>()
         );
@@ -313,8 +301,7 @@ mod tests {
             paths: vec![tmp.path().to_path_buf()],
             ..Default::default()
         };
-        let coordinator =
-            ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
+        let coordinator = ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
         let rx = coordinator.start();
         let found = collect_events(rx);
 
@@ -336,8 +323,7 @@ mod tests {
             paths: vec![tmp.path().to_path_buf()],
             ..Default::default()
         };
-        let coordinator =
-            ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
+        let coordinator = ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
         let rx = coordinator.start();
         let found = collect_events(rx);
 
@@ -360,8 +346,7 @@ mod tests {
             paths: vec![tmp.path().to_path_buf()],
             ..Default::default()
         };
-        let coordinator =
-            ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
+        let coordinator = ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
         let rx = coordinator.start();
         let found = collect_events(rx);
 
@@ -385,8 +370,7 @@ mod tests {
             paths: vec![tmp.path().to_path_buf()],
             ..Default::default()
         };
-        let coordinator =
-            ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
+        let coordinator = ScanCoordinator::new(config, builtin_rules(), default_app_paths(&tmp));
         let rx = coordinator.start();
         let found = collect_events(rx);
 

@@ -1,10 +1,10 @@
 use bytesize::ByteSize;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::Widget,
-    Frame,
 };
 
 use crate::tui::app::{App, AppMode};
@@ -21,7 +21,9 @@ pub fn render_header_content(frame: &mut Frame, area: Rect, app: &App) {
     let spans: Vec<Span> = if app.scan_complete {
         let (count, size) = app.tree.selection_summary();
         let total: u64 = app.tree.categories.iter().map(|c| c.total_size).sum();
-        let n_arts: usize = app.tree.categories
+        let n_arts: usize = app
+            .tree
+            .categories
             .iter()
             .flat_map(|c| c.children.iter())
             .map(|g| g.children.len())
@@ -40,17 +42,17 @@ pub fn render_header_content(frame: &mut Frame, area: Rect, app: &App) {
             ),
         ]
     } else {
-        let spinner = SPINNER_FRAMES
-            [(app.tick_count as usize / 2) % SPINNER_FRAMES.len()];
+        let spinner = SPINNER_FRAMES[(app.tick_count as usize / 2) % SPINNER_FRAMES.len()];
         let elapsed = app.scan_progress.elapsed_ms;
         vec![
-            Span::styled(format!(" {spinner}"), Style::default().fg(theme::SPINNER_FG)),
+            Span::styled(
+                format!(" {spinner}"),
+                Style::default().fg(theme::SPINNER_FG),
+            ),
             Span::styled(
                 format!(
                     "  scanning... {} dirs  {} found  {}ms",
-                    app.scan_progress.dirs_visited,
-                    app.scan_progress.artifacts_found,
-                    elapsed,
+                    app.scan_progress.dirs_visited, app.scan_progress.artifacts_found, elapsed,
                 ),
                 Style::default().fg(theme::HEADER_FG),
             ),
@@ -69,9 +71,10 @@ pub fn render_proportional_bar(frame: &mut Frame, area: Rect, app: &App) {
 
     let total: u64 = app.tree.categories.iter().map(|c| c.total_size).sum();
     if total == 0 {
-        let empty = Line::from(vec![
-            Span::styled(" no artifacts found", Style::default().fg(theme::DIMMED)),
-        ]);
+        let empty = Line::from(vec![Span::styled(
+            " no artifacts found",
+            Style::default().fg(theme::DIMMED),
+        )]);
         empty.render(area, frame.buffer_mut());
         return;
     }
@@ -124,9 +127,7 @@ pub fn render_proportional_bar(frame: &mut Frame, area: Rect, app: &App) {
 
         // Fill segment with block chars and overlay the label if it fits.
         for col in x..(x + seg_w as u16).min(area.x + area.width) {
-            buf[(col, area.y)]
-                .set_char('█')
-                .set_fg(color);
+            buf[(col, area.y)].set_char('█').set_fg(color);
         }
 
         // Overlay the label text if it fits within the segment.
@@ -153,6 +154,7 @@ pub fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
         AppMode::Normal => vec![
             ("Space", "check"),
             ("a/A", "all/none"),
+            ("c", "change dir"),
             ("d", "delete"),
             ("/", "search"),
             ("s", "sort"),
@@ -167,18 +169,17 @@ pub fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
             ("Esc", "cancel"),
             ("Backspace", "delete char"),
         ],
-        AppMode::ConfirmDelete => vec![
-            ("y/Enter", "confirm"),
-            ("n/Esc", "cancel"),
-        ],
-        AppMode::ConfirmQuit => vec![
-            ("t", "open trash"),
-            ("q", "quit anyway"),
+        AppMode::ChangePath => vec![
+            ("\u{2191}\u{2193}", "move"),
+            ("\u{2192}", "open dir"),
+            ("\u{2190}", "go up"),
+            ("Enter", "select"),
+            (".", "hidden"),
             ("Esc", "cancel"),
         ],
-        AppMode::Help => vec![
-            ("q/Esc", "close"),
-        ],
+        AppMode::ConfirmDelete => vec![("y/Enter", "confirm"), ("n/Esc", "cancel")],
+        AppMode::ConfirmQuit => vec![("t", "open trash"), ("q", "quit anyway"), ("Esc", "cancel")],
+        AppMode::Help => vec![("q/Esc", "close")],
         AppMode::TrashBrowser => vec![
             ("j/k", "move"),
             ("Space", "check"),

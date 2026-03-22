@@ -159,7 +159,10 @@ fn rust_target_is_found_with_cargo_context() {
             .iter()
             .any(|a| a.path.ends_with("target") && a.rule_id == "cargo-target"),
         "Rust target/ should be found with cargo-target rule; got: {:?}",
-        found.iter().map(|a| (&a.path, &a.rule_id)).collect::<Vec<_>>()
+        found
+            .iter()
+            .map(|a| (&a.path, &a.rule_id))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -223,11 +226,7 @@ fn git_directory_is_skipped() {
 
     let git_hits: Vec<_> = found
         .iter()
-        .filter(|a| {
-            a.path
-                .components()
-                .any(|c| c.as_os_str() == ".git")
-        })
+        .filter(|a| a.path.components().any(|c| c.as_os_str() == ".git"))
         .collect();
 
     assert!(
@@ -243,7 +242,13 @@ fn no_false_positives_in_complex_tree() {
     let found = fixture.run_scan();
 
     // Only these paths should be found. Collect their trailing names.
-    let expected_names = ["node_modules", "target", "__pycache__", ".pytest_cache", ".venv"];
+    let expected_names = [
+        "node_modules",
+        "target",
+        "__pycache__",
+        ".pytest_cache",
+        ".venv",
+    ];
 
     for artifact in &found {
         let name = artifact

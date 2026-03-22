@@ -72,12 +72,7 @@ mod tests {
     use super::*;
     use crate::rules::types::{Category, SafetyLevel};
 
-    fn make_rule(
-        id: &str,
-        condition: MatchCondition,
-        markers: Vec<&str>,
-        enabled: bool,
-    ) -> Rule {
+    fn make_rule(id: &str, condition: MatchCondition, markers: Vec<&str>, enabled: bool) -> Rule {
         Rule {
             id: id.to_string(),
             name: id.to_string(),

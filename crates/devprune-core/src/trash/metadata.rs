@@ -126,13 +126,14 @@ impl TrashManifest {
             match (has_metadata, has_content) {
                 (true, true) => {
                     let raw = fs::read_to_string(&metadata_path)?;
-                    let meta: TrashEntryMetadata =
-                        serde_json::from_str(&raw).map_err(|e| DevpruneError::ManifestCorrupted {
+                    let meta: TrashEntryMetadata = serde_json::from_str(&raw).map_err(|e| {
+                        DevpruneError::ManifestCorrupted {
                             message: format!(
                                 "failed to parse metadata at {}: {e}",
                                 metadata_path.display()
                             ),
-                        })?;
+                        }
+                    })?;
                     entries.push(TrashManifestEntry::from(&meta));
                 }
                 (true, false) => {

@@ -5,10 +5,13 @@ use ratatui::{
     layout::{Alignment, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap},
+    widgets::{
+        Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        StatefulWidget, Widget, Wrap,
+    },
 };
 
-use crate::tui::app::{App, TrashBrowserState};
+use crate::tui::app::{App, FsBrowserState, FsEntry, TrashBrowserState};
 use crate::tui::ui::theme;
 
 /// Renders a centred dialog box over the current frame.
@@ -99,7 +102,10 @@ pub fn render_confirm_quit(frame_area: Rect, buf: &mut Buffer, app: &App) {
 
     let lines = vec![
         Line::from(""),
-        Line::from(vec![Span::styled(msg, Style::default().fg(theme::FOREGROUND))]),
+        Line::from(vec![Span::styled(
+            msg,
+            Style::default().fg(theme::FOREGROUND),
+        )]),
         Line::from(""),
         Line::from(vec![
             Span::styled("[t]", Style::default().fg(theme::FOOTER_KEY_FG)),
@@ -141,6 +147,7 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
         ("  A", "Deselect all"),
         ("", ""),
         ("Actions", ""),
+        ("  c", "Browse for scan directory"),
         ("  d", "Delete selected items"),
         ("  /", "Filter / search"),
         ("  s", "Cycle sort order"),
@@ -172,7 +179,10 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
                 }
             } else {
                 Line::from(vec![
-                    Span::styled(format!("{key:<20}", key = key), Style::default().fg(theme::FOOTER_KEY_FG)),
+                    Span::styled(
+                        format!("{key:<20}", key = key),
+                        Style::default().fg(theme::FOOTER_KEY_FG),
+                    ),
                     Span::styled(*desc, Style::default().fg(theme::FOREGROUND)),
                 ])
             }
@@ -256,13 +266,19 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
 
     // Fixed column widths: checkbox(5) + path(flexible) + gap(1) + size(10) + category(18)
     let w = inner.width as usize;
-    let check_col = 5;   // " [x] "
-    let gap = 1;          // space between path and size
-    let size_col = 10;   // "  1.3 GiB "
-    let cat_col = 18;    // " Build Output      "
+    let check_col = 5; // " [x] "
+    let gap = 1; // space between path and size
+    let size_col = 10; // "  1.3 GiB "
+    let cat_col = 18; // " Build Output      "
     let path_col = w.saturating_sub(check_col + gap + size_col + cat_col);
 
-    for (i, entry) in state.items.iter().enumerate().skip(offset).take(list_height) {
+    for (i, entry) in state
+        .items
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(list_height)
+    {
         let y = inner.y + (i - offset) as u16;
         if y >= inner.y + inner.height {
             break;
@@ -270,13 +286,23 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
 
         let checked = state.checked.get(i).copied().unwrap_or(false);
         let check_sym = if checked { "[x] " } else { "[ ] " };
-        let check_color = if checked { theme::CHECKBOX_CHECKED } else { theme::CHECKBOX_EMPTY };
+        let check_color = if checked {
+            theme::CHECKBOX_CHECKED
+        } else {
+            theme::CHECKBOX_EMPTY
+        };
         let is_cursor = i == state.cursor;
-        let row_bg = if is_cursor { theme::HIGHLIGHT_BG } else { theme::DIALOG_BG };
+        let row_bg = if is_cursor {
+            theme::HIGHLIGHT_BG
+        } else {
+            theme::DIALOG_BG
+        };
 
         // Clear the row
         for col in inner.x..(inner.x + inner.width) {
-            buf[(col, y)].set_style(Style::default().bg(row_bg)).set_char(' ');
+            buf[(col, y)]
+                .set_style(Style::default().bg(row_bg))
+                .set_char(' ');
         }
 
         let path_str = entry.original_path.display().to_string();
@@ -293,12 +319,18 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         let mut x = inner.x;
 
         // Checkbox
-        let check_span = Span::styled(format!(" {check_sym}"), Style::default().fg(check_color).bg(row_bg));
+        let check_span = Span::styled(
+            format!(" {check_sym}"),
+            Style::default().fg(check_color).bg(row_bg),
+        );
         Line::from(vec![check_span]).render(Rect::new(x, y, check_col as u16, 1), buf);
         x += check_col as u16;
 
         // Path + gap
-        let path_span = Span::styled(path_display, Style::default().fg(theme::FOREGROUND).bg(row_bg));
+        let path_span = Span::styled(
+            path_display,
+            Style::default().fg(theme::FOREGROUND).bg(row_bg),
+        );
         Line::from(vec![path_span]).render(Rect::new(x, y, path_col as u16, 1), buf);
         x += (path_col + gap) as u16;
 
@@ -308,7 +340,10 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         x += size_col as u16;
 
         // Category
-        let cat_span = Span::styled(format!(" {cat_str}"), Style::default().fg(theme::DIMMED).bg(row_bg));
+        let cat_span = Span::styled(
+            format!(" {cat_str}"),
+            Style::default().fg(theme::DIMMED).bg(row_bg),
+        );
         Line::from(vec![cat_span]).render(Rect::new(x, y, cat_col as u16, 1), buf);
     }
 
@@ -320,22 +355,25 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
 
         // Split path across two lines if needed.
         if full_path.len() <= w {
-            Line::from(vec![
-                Span::styled(format!(" {full_path}"), Style::default().fg(theme::SPINNER_FG)),
-            ])
+            Line::from(vec![Span::styled(
+                format!(" {full_path}"),
+                Style::default().fg(theme::SPINNER_FG),
+            )])
             .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
         } else {
             // First line: as much as fits
             let split = w.min(full_path.len());
             let line1 = &full_path[..split];
             let line2 = &full_path[split..];
-            Line::from(vec![
-                Span::styled(format!(" {line1}"), Style::default().fg(theme::SPINNER_FG)),
-            ])
+            Line::from(vec![Span::styled(
+                format!(" {line1}"),
+                Style::default().fg(theme::SPINNER_FG),
+            )])
             .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
-            Line::from(vec![
-                Span::styled(format!(" {line2}"), Style::default().fg(theme::SPINNER_FG)),
-            ])
+            Line::from(vec![Span::styled(
+                format!(" {line2}"),
+                Style::default().fg(theme::SPINNER_FG),
+            )])
             .render(Rect::new(inner.x, path_y + 1, inner.width, 1), buf);
         }
     }
@@ -343,8 +381,177 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
     // Scrollbar when content overflows.
     let total_items = state.items.len();
     if total_items > list_height {
-        let mut scrollbar_state = ScrollbarState::new(total_items)
-            .position(offset);
+        let mut scrollbar_state = ScrollbarState::new(total_items).position(offset);
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .track_style(Style::default().fg(theme::BORDER))
+            .thumb_style(Style::default().fg(theme::DIMMED))
+            .render(inner, buf, &mut scrollbar_state);
+    }
+}
+
+pub fn render_fs_browser(frame_area: Rect, buf: &mut Buffer, state: &mut FsBrowserState) {
+    let dialog_width = frame_area.width.saturating_sub(4).max(40);
+    let dialog_height = frame_area.height.saturating_sub(4).max(10);
+    let area = centered_rect(dialog_width, dialog_height, frame_area);
+
+    Clear.render(area, buf);
+
+    // Build title from current dir, truncated if needed.
+    let dir_str = state.current_dir.display().to_string();
+    let max_title_len = (dialog_width as usize).saturating_sub(14); // room for " Browse:  "
+    let title_path = if dir_str.len() > max_title_len && max_title_len > 3 {
+        format!("...{}", &dir_str[dir_str.len() - max_title_len + 3..])
+    } else {
+        dir_str
+    };
+    let title = format!(" Browse: {} ", title_path);
+
+    let hidden_label = if state.show_hidden { "on" } else { "off" };
+    let hint_line = Line::from(vec![
+        Span::styled(" \u{2192}", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":open "),
+        Span::styled("\u{2190}", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":up "),
+        Span::styled("Enter", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":select "),
+        Span::styled(".", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(format!(":hidden({hidden_label}) ")),
+        Span::styled("Esc", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":cancel "),
+    ]);
+
+    let block = Block::default()
+        .title(title)
+        .title_alignment(Alignment::Center)
+        .title_bottom(hint_line)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::DIALOG_BORDER))
+        .style(Style::default().bg(theme::DIALOG_BG));
+
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    // Show error if directory could not be read.
+    if let Some(ref err) = state.error {
+        let lines = vec![
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                format!("Error: {err}"),
+                Style::default().fg(theme::ERROR_FG),
+            )]),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Press Backspace to go up",
+                Style::default().fg(theme::DIMMED),
+            )]),
+        ];
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
+            .render(inner, buf);
+        return;
+    }
+
+    if state.entries.is_empty() {
+        let lines = vec![
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "No subdirectories",
+                Style::default().fg(theme::DIMMED),
+            )]),
+        ];
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
+            .render(inner, buf);
+        return;
+    }
+
+    // Reserve last line for full path of highlighted entry.
+    let list_height = inner.height.saturating_sub(1) as usize;
+
+    // Adjust scroll offset so cursor stays in view.
+    if state.cursor < state.scroll_offset {
+        state.scroll_offset = state.cursor;
+    } else if list_height > 0 && state.cursor >= state.scroll_offset + list_height {
+        state.scroll_offset = state.cursor - list_height + 1;
+    }
+    let offset = state.scroll_offset;
+
+    for (i, entry) in state
+        .entries
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(list_height)
+    {
+        let y = inner.y + (i - offset) as u16;
+        if y >= inner.y + inner.height {
+            break;
+        }
+
+        let is_cursor = i == state.cursor;
+        let row_bg = if is_cursor {
+            theme::HIGHLIGHT_BG
+        } else {
+            theme::DIALOG_BG
+        };
+
+        // Clear the row.
+        for col in inner.x..(inner.x + inner.width) {
+            buf[(col, y)]
+                .set_style(Style::default().bg(row_bg))
+                .set_char(' ');
+        }
+
+        let (display_name, fg) = match entry {
+            FsEntry::Parent => ("  ..".to_string(), theme::DIMMED),
+            FsEntry::Dir { name, .. } => (format!("  {name}/"), theme::FOREGROUND),
+        };
+
+        let name_style = if is_cursor {
+            Style::default()
+                .fg(fg)
+                .bg(row_bg)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(fg).bg(row_bg)
+        };
+
+        Line::from(vec![Span::styled(display_name, name_style)])
+            .render(Rect::new(inner.x, y, inner.width, 1), buf);
+    }
+
+    // Full path of highlighted entry on the last line.
+    if let Some(entry) = state.entries.get(state.cursor) {
+        let path_y = inner.y + inner.height.saturating_sub(1);
+        let full_path = match entry {
+            FsEntry::Parent => state
+                .current_dir
+                .parent()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            FsEntry::Dir { path, .. } => path.display().to_string(),
+        };
+        let w = inner.width as usize;
+        let display = if full_path.len() > w && w > 3 {
+            format!("...{}", &full_path[full_path.len() - w + 3..])
+        } else {
+            full_path
+        };
+        Line::from(vec![Span::styled(
+            format!(" {display}"),
+            Style::default().fg(theme::SPINNER_FG),
+        )])
+        .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
+    }
+
+    // Scrollbar when content overflows.
+    let total_items = state.entries.len();
+    if total_items > list_height {
+        let mut scrollbar_state = ScrollbarState::new(total_items).position(offset);
         Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(None)
             .end_symbol(None)

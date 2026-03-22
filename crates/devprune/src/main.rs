@@ -144,9 +144,8 @@ fn collect_scan_results(
 // ---------------------------------------------------------------------------
 
 fn run_headless(cli: &Cli) -> anyhow::Result<()> {
-    let app_paths = AppPaths::resolve().ok_or_else(|| {
-        anyhow::anyhow!("could not resolve application data directories")
-    })?;
+    let app_paths = AppPaths::resolve()
+        .ok_or_else(|| anyhow::anyhow!("could not resolve application data directories"))?;
 
     let scan_config = build_scan_config(cli, &app_paths)?;
     let base_rules = load_user_rules(&app_paths.config_dir, builtin_rules()).unwrap_or_else(|e| {
@@ -173,9 +172,8 @@ fn run_headless(cli: &Cli) -> anyhow::Result<()> {
 // ---------------------------------------------------------------------------
 
 fn run_auto(cli: &Cli) -> anyhow::Result<()> {
-    let app_paths = AppPaths::resolve().ok_or_else(|| {
-        anyhow::anyhow!("could not resolve application data directories")
-    })?;
+    let app_paths = AppPaths::resolve()
+        .ok_or_else(|| anyhow::anyhow!("could not resolve application data directories"))?;
 
     let scan_config = build_scan_config(cli, &app_paths)?;
     let base_rules = load_user_rules(&app_paths.config_dir, builtin_rules()).unwrap_or_else(|e| {
@@ -209,7 +207,10 @@ fn run_auto(cli: &Cli) -> anyhow::Result<()> {
             duration_ms,
         );
         for a in &artifacts {
-            let size_str = a.size.map(|s| ByteSize(s).to_string()).unwrap_or_else(|| "?".to_string());
+            let size_str = a
+                .size
+                .map(|s| ByteSize(s).to_string())
+                .unwrap_or_else(|| "?".to_string());
             println!("  {}  {}", size_str, a.path.display());
         }
     }
@@ -497,10 +498,12 @@ fn print_json(cli: &Cli, artifacts: &[ArtifactInfo], duration_ms: u128) -> anyho
     let mut summary_by_category: HashMap<String, JsonCategorySummary> = HashMap::new();
     for a in artifacts {
         let key = a.category.display_name().to_string();
-        let entry = summary_by_category.entry(key).or_insert(JsonCategorySummary {
-            count: 0,
-            size_bytes: 0,
-        });
+        let entry = summary_by_category
+            .entry(key)
+            .or_insert(JsonCategorySummary {
+                count: 0,
+                size_bytes: 0,
+            });
         entry.count += 1;
         entry.size_bytes += a.size.unwrap_or(0);
     }
@@ -598,8 +601,9 @@ fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
 
         TrashAction::Purge { older_than } => {
             if let Some(duration_str) = older_than {
-                let days = parse_duration_days(duration_str)
-                    .ok_or_else(|| anyhow::anyhow!("invalid duration: {duration_str} (expected e.g. 30d)"))?;
+                let days = parse_duration_days(duration_str).ok_or_else(|| {
+                    anyhow::anyhow!("invalid duration: {duration_str} (expected e.g. 30d)")
+                })?;
                 let purged = trash_manager
                     .purge_older_than(days)
                     .map_err(|e| anyhow::anyhow!("purge failed: {e}"))?;
@@ -624,11 +628,7 @@ fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
                     count += 1;
                 }
                 if !cli.quiet {
-                    println!(
-                        "Purged {} item{}.",
-                        count,
-                        plural(count)
-                    );
+                    println!("Purged {} item{}.", count, plural(count));
                 }
             }
         }

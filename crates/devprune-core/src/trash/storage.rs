@@ -61,11 +61,10 @@ impl TrashManager {
         };
 
         // Write metadata first so we can detect a partial trash on rebuild.
-        let meta_json = serde_json::to_string_pretty(&metadata).map_err(|e| {
-            DevpruneError::Trash {
+        let meta_json =
+            serde_json::to_string_pretty(&metadata).map_err(|e| DevpruneError::Trash {
                 message: format!("failed to serialize metadata: {e}"),
-            }
-        })?;
+            })?;
         fs::write(item_dir.join(METADATA_FILENAME), meta_json)?;
 
         // Move the content.
@@ -369,7 +368,12 @@ mod tests {
         let manager = make_manager(tmp.path());
 
         // Source lives in a deep tree that will not exist when we restore.
-        let src = tmp.path().join("deep").join("nested").join("dir").join("file.txt");
+        let src = tmp
+            .path()
+            .join("deep")
+            .join("nested")
+            .join("dir")
+            .join("file.txt");
         write_file(&src, "hello");
 
         let id = manager

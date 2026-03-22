@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use devprune_core::config::AppPaths;
 use devprune_core::rules::types::{Category, SafetyLevel};
@@ -124,9 +125,18 @@ impl ArtifactNode {
 
 #[derive(Debug, Clone)]
 pub enum RowRef {
-    Category { cat_idx: usize },
-    RuleGroup { cat_idx: usize, grp_idx: usize },
-    Artifact { cat_idx: usize, grp_idx: usize, art_idx: usize },
+    Category {
+        cat_idx: usize,
+    },
+    RuleGroup {
+        cat_idx: usize,
+        grp_idx: usize,
+    },
+    Artifact {
+        cat_idx: usize,
+        grp_idx: usize,
+        art_idx: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -161,7 +171,8 @@ impl TreeState {
         let artifact_id = artifact.id;
 
         // Find or create category node.
-        let cat_idx = if let Some(idx) = self.categories.iter().position(|c| c.category == category) {
+        let cat_idx = if let Some(idx) = self.categories.iter().position(|c| c.category == category)
+        {
             idx
         } else {
             let node = CategoryNode {
@@ -201,7 +212,10 @@ impl TreeState {
         let size = artifact.size.unwrap_or(0);
         self.categories[cat_idx].children[grp_idx]
             .children
-            .push(ArtifactNode { artifact, checked: false });
+            .push(ArtifactNode {
+                artifact,
+                checked: false,
+            });
 
         // Update aggregate sizes.
         self.categories[cat_idx].children[grp_idx].total_size += size;
@@ -228,9 +242,10 @@ impl TreeState {
         for (ci, cat) in &cats {
             let ci = *ci;
             // Skip category if no child passes all active filters.
-            let cat_has_visible = cat.children.iter().any(|g| {
-                g.children.iter().any(|a| self.artifact_is_visible(a))
-            });
+            let cat_has_visible = cat
+                .children
+                .iter()
+                .any(|g| g.children.iter().any(|a| self.artifact_is_visible(a)));
             if !cat_has_visible {
                 continue;
             }
@@ -266,7 +281,10 @@ impl TreeState {
                 }
 
                 rows.push(VisibleRow {
-                    row_ref: RowRef::RuleGroup { cat_idx: ci, grp_idx: gi },
+                    row_ref: RowRef::RuleGroup {
+                        cat_idx: ci,
+                        grp_idx: gi,
+                    },
                     depth: 1,
                     check_state: grp.check_state,
                     expanded: Some(grp.expanded),
@@ -282,9 +300,7 @@ impl TreeState {
                 let mut arts: Vec<(usize, &ArtifactNode)> =
                     grp.children.iter().enumerate().collect();
                 match self.sort {
-                    SortOrder::SizeDesc => {
-                        arts.sort_by(|a, b| b.1.size().cmp(&a.1.size()))
-                    }
+                    SortOrder::SizeDesc => arts.sort_by(|a, b| b.1.size().cmp(&a.1.size())),
                     SortOrder::Name => arts.sort_by_key(|(_, a)| {
                         a.artifact
                             .path
@@ -309,7 +325,11 @@ impl TreeState {
                         .unwrap_or_else(|| art.artifact.path.display().to_string());
 
                     rows.push(VisibleRow {
-                        row_ref: RowRef::Artifact { cat_idx: ci, grp_idx: gi, art_idx: ai },
+                        row_ref: RowRef::Artifact {
+                            cat_idx: ci,
+                            grp_idx: gi,
+                            art_idx: ai,
+                        },
                         depth: 2,
                         check_state: if art.checked {
                             CheckState::Checked
@@ -335,7 +355,12 @@ impl TreeState {
         }
         if let Some(ref q) = self.search_filter {
             let q = q.to_lowercase();
-            if !art.artifact.path.to_string_lossy().to_lowercase().contains(&q)
+            if !art
+                .artifact
+                .path
+                .to_string_lossy()
+                .to_lowercase()
+                .contains(&q)
                 && !art.artifact.rule_name.to_lowercase().contains(&q)
             {
                 return false;
@@ -391,7 +416,11 @@ impl TreeState {
                 };
                 self.refresh_category_check(cat_idx);
             }
-            RowRef::Artifact { cat_idx, grp_idx, art_idx } => {
+            RowRef::Artifact {
+                cat_idx,
+                grp_idx,
+                art_idx,
+            } => {
                 let art = &mut self.categories[cat_idx].children[grp_idx].children[art_idx];
                 art.checked = !art.checked;
                 self.refresh_group_check(cat_idx, grp_idx);
@@ -434,19 +463,23 @@ impl TreeState {
                     // Already collapsed - jump cursor to parent category
                     // Find the category row in visible rows
                     for (i, r) in rows.iter().enumerate() {
-                        if matches!(&r.row_ref, RowRef::Category { cat_idx: ci } if *ci == cat_idx) {
+                        if matches!(&r.row_ref, RowRef::Category { cat_idx: ci } if *ci == cat_idx)
+                        {
                             self.cursor = i;
                             break;
                         }
                     }
                 }
             }
-            RowRef::Artifact { cat_idx, grp_idx, .. } => {
+            RowRef::Artifact {
+                cat_idx, grp_idx, ..
+            } => {
                 // On a leaf - collapse the parent rule group
                 self.categories[cat_idx].children[grp_idx].expanded = false;
                 // Jump cursor to the rule group row
                 for (i, r) in rows.iter().enumerate() {
-                    if matches!(&r.row_ref, RowRef::RuleGroup { cat_idx: ci, grp_idx: gi } if *ci == cat_idx && *gi == grp_idx) {
+                    if matches!(&r.row_ref, RowRef::RuleGroup { cat_idx: ci, grp_idx: gi } if *ci == cat_idx && *gi == grp_idx)
+                    {
                         self.cursor = i;
                         break;
                     }
@@ -456,7 +489,11 @@ impl TreeState {
     }
 
     pub fn select_all(&mut self, checked: bool) {
-        let state = if checked { CheckState::Checked } else { CheckState::Unchecked };
+        let state = if checked {
+            CheckState::Checked
+        } else {
+            CheckState::Unchecked
+        };
         for cat in &mut self.categories {
             for grp in &mut cat.children {
                 for art in &mut grp.children {
@@ -483,7 +520,12 @@ impl TreeState {
     pub fn cursor_artifact(&self) -> Option<&ArtifactInfo> {
         let rows = self.visible_rows();
         let row = rows.get(self.cursor)?;
-        if let RowRef::Artifact { cat_idx, grp_idx, art_idx } = &row.row_ref {
+        if let RowRef::Artifact {
+            cat_idx,
+            grp_idx,
+            art_idx,
+        } = &row.row_ref
+        {
             Some(&self.categories[*cat_idx].children[*grp_idx].children[*art_idx].artifact)
         } else {
             None
@@ -587,6 +629,7 @@ pub struct ScanProgressState {
 pub enum AppMode {
     Normal,
     Search { query: String },
+    ChangePath,
     ConfirmDelete,
     ConfirmQuit,
     Help,
@@ -616,10 +659,17 @@ pub struct App {
     pub trash_manager: Option<TrashManager>,
     /// State for the trash browser overlay.
     pub trash_browser: TrashBrowserState,
+    /// State for the filesystem browser overlay.
+    pub fs_browser: FsBrowserState,
     /// Cached trash stats (item count, total bytes).
     pub trash_stats: TrashStats,
     /// Set to true when user requests a rescan.
     pub rescan_requested: bool,
+    /// The currently active scan path(s), displayed in the path block.
+    pub scan_paths: Vec<PathBuf>,
+    /// When the user confirms a new path in ChangePath mode, the new path
+    /// is placed here. The event loop in run_tui reads and applies it.
+    pub pending_path_change: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -629,7 +679,11 @@ pub struct TrashStats {
 }
 
 impl App {
-    pub fn new(app_paths: AppPaths, trash_manager: Option<TrashManager>) -> Self {
+    pub fn new(
+        app_paths: AppPaths,
+        trash_manager: Option<TrashManager>,
+        scan_paths: Vec<PathBuf>,
+    ) -> Self {
         let trash_stats = trash_manager
             .as_ref()
             .and_then(|tm| tm.list_items().ok())
@@ -652,8 +706,11 @@ impl App {
             status_message_ticks: 0,
             trash_manager,
             trash_browser: TrashBrowserState::default(),
+            fs_browser: FsBrowserState::default(),
             trash_stats,
             rescan_requested: false,
+            scan_paths,
+            pending_path_change: None,
         }
     }
 
@@ -667,6 +724,7 @@ impl App {
         self.set_status_message("rescanning...".to_string());
         self.mode = AppMode::Normal;
         self.rescan_requested = false;
+        self.pending_path_change = None;
     }
 
     /// Refresh cached trash stats from the trash manager.
@@ -697,6 +755,148 @@ impl App {
                 self.status_message_ticks = 0;
             }
         }
+    }
+}
+
+// ── FsBrowserState ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub enum FsEntry {
+    /// The ".." parent directory entry, always first.
+    Parent,
+    /// A subdirectory with its display name and full path.
+    Dir { name: String, path: PathBuf },
+}
+
+#[derive(Debug)]
+pub struct FsBrowserState {
+    /// The directory whose contents are currently displayed.
+    pub current_dir: PathBuf,
+    /// Listed entries (Parent + sorted dirs).
+    pub entries: Vec<FsEntry>,
+    pub cursor: usize,
+    pub scroll_offset: usize,
+    pub show_hidden: bool,
+    pub error: Option<String>,
+}
+
+impl Default for FsBrowserState {
+    fn default() -> Self {
+        Self {
+            current_dir: PathBuf::new(),
+            entries: Vec::new(),
+            cursor: 0,
+            scroll_offset: 0,
+            show_hidden: false,
+            error: None,
+        }
+    }
+}
+
+impl FsBrowserState {
+    /// Load directory contents. Resets cursor and scroll.
+    pub fn load(&mut self, dir: PathBuf) {
+        let dir = dir.canonicalize().unwrap_or(dir);
+        self.current_dir = dir;
+        self.cursor = 0;
+        self.scroll_offset = 0;
+        self.error = None;
+        self.refresh_entries();
+    }
+
+    /// Re-read the current directory (e.g. after toggling hidden).
+    pub fn refresh(&mut self) {
+        let prev_cursor = self.cursor;
+        self.error = None;
+        self.refresh_entries();
+        // Try to keep cursor in the same position.
+        if !self.entries.is_empty() {
+            self.cursor = prev_cursor.min(self.entries.len() - 1);
+        } else {
+            self.cursor = 0;
+        }
+    }
+
+    fn refresh_entries(&mut self) {
+        self.entries.clear();
+
+        // Add ".." if we're not at the filesystem root.
+        if self.current_dir.parent().is_some() {
+            self.entries.push(FsEntry::Parent);
+        }
+
+        let read = match std::fs::read_dir(&self.current_dir) {
+            Ok(rd) => rd,
+            Err(e) => {
+                self.error = Some(e.to_string());
+                return;
+            }
+        };
+
+        let mut dirs: Vec<(String, PathBuf)> = read
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !self.show_hidden && name.starts_with('.') {
+                    return None;
+                }
+                Some((name, entry.path()))
+            })
+            .collect();
+
+        dirs.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+        for (name, path) in dirs {
+            self.entries.push(FsEntry::Dir { name, path });
+        }
+    }
+
+    pub fn move_cursor(&mut self, delta: i64) {
+        let count = self.entries.len();
+        if count == 0 {
+            return;
+        }
+        if delta > 0 {
+            self.cursor = (self.cursor + delta as usize).min(count - 1);
+        } else {
+            self.cursor = self.cursor.saturating_sub((-delta) as usize);
+        }
+    }
+
+    /// Navigate into the directory at the cursor.
+    pub fn enter_selected(&mut self) {
+        let Some(entry) = self.entries.get(self.cursor) else {
+            return;
+        };
+        let target = match entry {
+            FsEntry::Parent => {
+                let Some(parent) = self.current_dir.parent() else {
+                    return;
+                };
+                parent.to_path_buf()
+            }
+            FsEntry::Dir { path, .. } => path.clone(),
+        };
+        self.load(target);
+    }
+
+    /// Navigate to the parent directory.
+    pub fn go_up(&mut self) {
+        if let Some(parent) = self.current_dir.parent().map(|p| p.to_path_buf()) {
+            self.load(parent);
+        }
+    }
+
+    /// Returns the current directory path (the one the user would select).
+    pub fn selected_path(&self) -> PathBuf {
+        self.current_dir.clone()
+    }
+
+    /// Toggle visibility of hidden (dot) directories and refresh.
+    pub fn toggle_hidden(&mut self) {
+        self.show_hidden = !self.show_hidden;
+        self.refresh();
     }
 }
 
@@ -752,14 +952,20 @@ impl TrashBrowserState {
         let mut items = std::mem::take(&mut self.items);
         self.apply_sort(&mut items);
         // Preserve checked state by rebuilding from ids
-        let checked_ids: std::collections::HashSet<uuid::Uuid> = self.items.iter()
+        let checked_ids: std::collections::HashSet<uuid::Uuid> = self
+            .items
+            .iter()
             .enumerate()
             .filter(|(i, _)| self.checked.get(*i).copied().unwrap_or(false))
             .map(|(_, e)| e.id)
             .collect();
         let len = items.len();
         self.items = items;
-        self.checked = self.items.iter().map(|e| checked_ids.contains(&e.id)).collect();
+        self.checked = self
+            .items
+            .iter()
+            .map(|e| checked_ids.contains(&e.id))
+            .collect();
         if len > 0 {
             self.cursor = self.cursor.min(len - 1);
         }
@@ -847,8 +1053,16 @@ mod tests {
     #[test]
     fn add_artifact_reuses_existing_category_and_group() {
         let mut tree = TreeState::default();
-        tree.add_artifact(make_artifact("/tmp/a/node_modules", "npm", Category::Dependencies));
-        tree.add_artifact(make_artifact("/tmp/b/node_modules", "npm", Category::Dependencies));
+        tree.add_artifact(make_artifact(
+            "/tmp/a/node_modules",
+            "npm",
+            Category::Dependencies,
+        ));
+        tree.add_artifact(make_artifact(
+            "/tmp/b/node_modules",
+            "npm",
+            Category::Dependencies,
+        ));
         assert_eq!(tree.categories.len(), 1);
         assert_eq!(tree.categories[0].children.len(), 1);
         assert_eq!(tree.categories[0].children[0].children.len(), 2);
@@ -868,11 +1082,18 @@ mod tests {
     #[test]
     fn toggle_check_artifact_propagates_to_group_and_category() {
         let mut tree = TreeState::default();
-        tree.add_artifact(make_artifact("/tmp/node_modules", "npm", Category::Dependencies));
+        tree.add_artifact(make_artifact(
+            "/tmp/node_modules",
+            "npm",
+            Category::Dependencies,
+        ));
         tree.toggle_check(2); // row 0=cat, 1=grp, 2=artifact
         let art = &tree.categories[0].children[0].children[0];
         assert!(art.checked);
-        assert_eq!(tree.categories[0].children[0].check_state, CheckState::Checked);
+        assert_eq!(
+            tree.categories[0].children[0].check_state,
+            CheckState::Checked
+        );
         assert_eq!(tree.categories[0].check_state, CheckState::Checked);
     }
 
@@ -910,7 +1131,11 @@ mod tests {
     #[test]
     fn search_filter_hides_non_matching() {
         let mut tree = TreeState::default();
-        tree.add_artifact(make_artifact("/tmp/node_modules", "npm", Category::Dependencies));
+        tree.add_artifact(make_artifact(
+            "/tmp/node_modules",
+            "npm",
+            Category::Dependencies,
+        ));
         tree.add_artifact(make_artifact("/tmp/target", "cargo", Category::BuildOutput));
         tree.search_filter = Some("node".to_string());
         let rows = tree.visible_rows();
@@ -926,7 +1151,12 @@ mod tests {
         assert_eq!(SortOrder::Path.next(), SortOrder::SizeDesc);
     }
 
-    fn make_artifact_with_safety(path: &str, rule_id: &str, category: Category, safety: SafetyLevel) -> ArtifactInfo {
+    fn make_artifact_with_safety(
+        path: &str,
+        rule_id: &str,
+        category: Category,
+        safety: SafetyLevel,
+    ) -> ArtifactInfo {
         ArtifactInfo {
             safety,
             ..make_artifact(path, rule_id, category)
@@ -936,14 +1166,34 @@ mod tests {
     #[test]
     fn safety_filter_hides_non_matching() {
         let mut tree = TreeState::default();
-        tree.add_artifact(make_artifact_with_safety("/tmp/a", "npm", Category::Dependencies, SafetyLevel::Safe));
-        tree.add_artifact(make_artifact_with_safety("/tmp/b", "cargo", Category::BuildOutput, SafetyLevel::Cautious));
-        tree.add_artifact(make_artifact_with_safety("/tmp/c", "venv", Category::VirtualEnv, SafetyLevel::Risky));
+        tree.add_artifact(make_artifact_with_safety(
+            "/tmp/a",
+            "npm",
+            Category::Dependencies,
+            SafetyLevel::Safe,
+        ));
+        tree.add_artifact(make_artifact_with_safety(
+            "/tmp/b",
+            "cargo",
+            Category::BuildOutput,
+            SafetyLevel::Cautious,
+        ));
+        tree.add_artifact(make_artifact_with_safety(
+            "/tmp/c",
+            "venv",
+            Category::VirtualEnv,
+            SafetyLevel::Risky,
+        ));
 
         tree.safety_filter = SafetyFilter::Safe;
         let rows = tree.visible_rows();
         // Should show: Dependencies category, npm group, /tmp/a = 3 rows.
-        assert_eq!(rows.len(), 3, "expected 3 rows for safe filter, got {}", rows.len());
+        assert_eq!(
+            rows.len(),
+            3,
+            "expected 3 rows for safe filter, got {}",
+            rows.len()
+        );
 
         tree.safety_filter = SafetyFilter::Cautious;
         let rows = tree.visible_rows();
