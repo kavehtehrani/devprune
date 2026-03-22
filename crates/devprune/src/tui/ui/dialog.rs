@@ -125,7 +125,7 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
         .render(inner, buf);
 }
 
-pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBrowserState) {
+pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut TrashBrowserState) {
     let dialog_width = 78u16.min(frame_area.width.saturating_sub(4));
     let dialog_height = 20u16.min(frame_area.height.saturating_sub(4));
     let area = centered_rect(dialog_width, dialog_height, frame_area);
@@ -150,13 +150,25 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
         Span::styled("Esc", Style::default().fg(theme::FOOTER_KEY_FG)),
         Span::raw(":back "),
     ]);
-    let block = Block::default()
+    // Show full path of highlighted item in a second bottom title (right-aligned).
+    let path_line = state.items.get(state.cursor).map(|entry| {
+        let path_str = format!(" {} ", entry.original_path.display());
+        Line::from(vec![
+            Span::styled(path_str, Style::default().fg(theme::DIMMED)),
+        ]).alignment(Alignment::Right)
+    });
+
+    let mut block = Block::default()
         .title(title)
         .title_alignment(Alignment::Center)
         .title_bottom(hint_line)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme::DIALOG_BORDER))
         .style(Style::default().bg(theme::DIALOG_BG));
+
+    if let Some(pl) = path_line {
+        block = block.title_top(pl);
+    }
 
     let inner = block.inner(area);
     block.render(area, buf);
@@ -182,12 +194,13 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
     }
 
     let list_height = inner.height as usize;
-    // Scroll so cursor is always visible.
-    let offset = if state.cursor >= list_height {
-        state.cursor - list_height + 1
-    } else {
-        0
-    };
+    // Adjust scroll offset so cursor stays in view (same logic as tree widget).
+    if state.cursor < state.scroll_offset {
+        state.scroll_offset = state.cursor;
+    } else if state.cursor >= state.scroll_offset + list_height {
+        state.scroll_offset = state.cursor - list_height + 1;
+    }
+    let offset = state.scroll_offset;
 
     // Fixed column widths: checkbox(5) + path(flexible) + gap(1) + size(10) + category(18)
     let w = inner.width as usize;

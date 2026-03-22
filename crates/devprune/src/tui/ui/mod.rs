@@ -22,7 +22,7 @@ use crate::tui::ui::{
 };
 
 /// Draw the full TUI frame.
-pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
+pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) {
     let area = frame.area();
 
     // ── Main layout: header | body | footer ─────────────────────────────
@@ -138,7 +138,7 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
             render_help(area, frame.buffer_mut());
         }
         AppMode::TrashBrowser => {
-            render_trash_browser(area, frame.buffer_mut(), &app.trash_browser);
+            render_trash_browser(area, frame.buffer_mut(), &mut app.trash_browser);
         }
         AppMode::Normal | AppMode::Search { .. } => {}
     }

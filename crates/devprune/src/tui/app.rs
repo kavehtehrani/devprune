@@ -732,6 +732,7 @@ pub struct TrashBrowserState {
     pub cursor: usize,
     pub checked: Vec<bool>,
     pub sort: TrashSort,
+    pub scroll_offset: usize,
 }
 
 impl TrashBrowserState {
@@ -741,6 +742,7 @@ impl TrashBrowserState {
         self.items = items;
         self.checked = vec![false; len];
         self.cursor = 0;
+        self.scroll_offset = 0;
     }
 
     pub fn cycle_sort(&mut self) {
