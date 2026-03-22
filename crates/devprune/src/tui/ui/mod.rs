@@ -130,7 +130,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
     frame.render_widget(footer_block, main_chunks[2]);
     use ratatui::widgets::Paragraph;
     Paragraph::new(Line::from(hint_spans))
-        .wrap(ratatui::widgets::Wrap { trim: false })
+        .wrap(ratatui::widgets::Wrap { trim: true })
         .render(footer_inner, frame.buffer_mut());
 
     // ── Overlay dialogs ─────────────────────────────────────────────────
