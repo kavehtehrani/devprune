@@ -132,10 +132,21 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
 
     Clear.render(area, buf);
 
-    let title = format!(" Trash Browser ({} item{}) ", state.items.len(), if state.items.len() == 1 { "" } else { "s" });
+    let title = format!(" trash ({} item{}) ", state.items.len(), if state.items.len() == 1 { "" } else { "s" });
+    let hint_line = Line::from(vec![
+        Span::styled(" Space", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":check "),
+        Span::styled("r", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":restore "),
+        Span::styled("p", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":purge "),
+        Span::styled("Esc", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":back "),
+    ]);
     let block = Block::default()
         .title(title)
         .title_alignment(Alignment::Center)
+        .title_bottom(hint_line)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme::DIALOG_BORDER))
         .style(Style::default().bg(theme::DIALOG_BG));
@@ -163,8 +174,7 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
         return;
     }
 
-    // Leave the last line for key hints.
-    let list_height = inner.height.saturating_sub(1) as usize;
+    let list_height = inner.height as usize;
     // Scroll so cursor is always visible.
     let offset = if state.cursor >= list_height {
         state.cursor - list_height + 1
@@ -200,18 +210,6 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
         ]);
         lines.push(line);
     }
-
-    // Key hints on the last line.
-    lines.push(Line::from(vec![
-        Span::styled("Space", Style::default().fg(theme::FOOTER_KEY_FG)),
-        Span::raw(":check  "),
-        Span::styled("r", Style::default().fg(theme::FOOTER_KEY_FG)),
-        Span::raw(":restore  "),
-        Span::styled("p", Style::default().fg(theme::FOOTER_KEY_FG)),
-        Span::raw(":purge  "),
-        Span::styled("Esc", Style::default().fg(theme::FOOTER_KEY_FG)),
-        Span::raw(":back"),
-    ]));
 
     Paragraph::new(lines)
         .wrap(Wrap { trim: false })
