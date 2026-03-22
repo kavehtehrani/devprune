@@ -41,8 +41,11 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
 
     // Determine the title suffix for the tree panel (shows active sort / filter).
     let sort_label = app.tree.sort.label();
+    let safety_label = app.tree.safety_filter.label();
     let tree_title = if let Some(ref q) = app.tree.search_filter {
-        format!(" Artifacts [sort:{sort_label}  filter:\"{q}\"] ")
+        format!(" Artifacts [sort:{sort_label}  safety:{safety_label}  filter:\"{q}\"] ")
+    } else if app.tree.safety_filter != crate::tui::app::SafetyFilter::All {
+        format!(" Artifacts [sort:{sort_label}  safety:{safety_label}] ")
     } else {
         format!(" Artifacts [sort:{sort_label}] ")
     };

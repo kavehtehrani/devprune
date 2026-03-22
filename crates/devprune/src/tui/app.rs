@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use devprune_core::config::AppPaths;
-use devprune_core::rules::types::Category;
+use devprune_core::rules::types::{Category, SafetyLevel};
 use devprune_core::trash::metadata::TrashManifestEntry;
 use devprune_core::trash::storage::TrashManager;
 use devprune_core::types::ArtifactInfo;
@@ -31,6 +31,48 @@ impl SortOrder {
             SortOrder::SizeDesc => "size↓",
             SortOrder::Name => "name",
             SortOrder::Path => "path",
+        }
+    }
+}
+
+// ── Safety filter ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SafetyFilter {
+    #[default]
+    All,
+    Safe,
+    Cautious,
+    Risky,
+}
+
+impl SafetyFilter {
+    pub fn next(self) -> Self {
+        match self {
+            SafetyFilter::All => SafetyFilter::Safe,
+            SafetyFilter::Safe => SafetyFilter::Cautious,
+            SafetyFilter::Cautious => SafetyFilter::Risky,
+            SafetyFilter::Risky => SafetyFilter::All,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SafetyFilter::All => "all",
+            SafetyFilter::Safe => "safe",
+            SafetyFilter::Cautious => "cautious",
+            SafetyFilter::Risky => "risky",
+        }
+    }
+
+    /// Returns true when the given safety level should be visible under this
+    /// filter.
+    pub fn matches(self, level: SafetyLevel) -> bool {
+        match self {
+            SafetyFilter::All => true,
+            SafetyFilter::Safe => level == SafetyLevel::Safe,
+            SafetyFilter::Cautious => level == SafetyLevel::Cautious,
+            SafetyFilter::Risky => level == SafetyLevel::Risky,
         }
     }
 }
@@ -114,6 +156,7 @@ pub struct TreeState {
     pub cursor: usize,
     pub sort: SortOrder,
     pub search_filter: Option<String>,
+    pub safety_filter: SafetyFilter,
 }
 
 impl TreeState {
@@ -191,14 +234,12 @@ impl TreeState {
 
         for (ci, cat) in &cats {
             let ci = *ci;
-            if let Some(ref q) = self.search_filter {
-                // Skip category entirely if no child matches the filter.
-                let has_match = cat.children.iter().any(|g| {
-                    g.children.iter().any(|a| self.artifact_matches_filter(a, q))
-                });
-                if !has_match {
-                    continue;
-                }
+            // Skip category if no child passes all active filters.
+            let cat_has_visible = cat.children.iter().any(|g| {
+                g.children.iter().any(|a| self.artifact_is_visible(a))
+            });
+            if !cat_has_visible {
+                continue;
             }
 
             rows.push(VisibleRow {
@@ -226,12 +267,9 @@ impl TreeState {
 
             for (gi, grp) in &groups {
                 let gi = *gi;
-                if let Some(ref q) = self.search_filter {
-                    let has_match =
-                        grp.children.iter().any(|a| self.artifact_matches_filter(a, q));
-                    if !has_match {
-                        continue;
-                    }
+                let grp_has_visible = grp.children.iter().any(|a| self.artifact_is_visible(a));
+                if !grp_has_visible {
+                    continue;
                 }
 
                 rows.push(VisibleRow {
@@ -266,10 +304,8 @@ impl TreeState {
 
                 for (ai, art) in &arts {
                     let ai = *ai;
-                    if let Some(ref q) = self.search_filter {
-                        if !self.artifact_matches_filter(art, q) {
-                            continue;
-                        }
+                    if !self.artifact_is_visible(art) {
+                        continue;
                     }
 
                     let name = art
@@ -298,10 +334,21 @@ impl TreeState {
         rows
     }
 
-    fn artifact_matches_filter(&self, art: &ArtifactNode, query: &str) -> bool {
-        let q = query.to_lowercase();
-        art.artifact.path.to_string_lossy().to_lowercase().contains(&q)
-            || art.artifact.rule_name.to_lowercase().contains(&q)
+    /// Returns true when the artifact should be shown given the current
+    /// search filter and safety filter.
+    fn artifact_is_visible(&self, art: &ArtifactNode) -> bool {
+        if !self.safety_filter.matches(art.artifact.safety) {
+            return false;
+        }
+        if let Some(ref q) = self.search_filter {
+            let q = q.to_lowercase();
+            if !art.artifact.path.to_string_lossy().to_lowercase().contains(&q)
+                && !art.artifact.rule_name.to_lowercase().contains(&q)
+            {
+                return false;
+            }
+        }
+        true
     }
 
     pub fn move_cursor(&mut self, delta: i64) {
@@ -708,5 +755,42 @@ mod tests {
         assert_eq!(SortOrder::SizeDesc.next(), SortOrder::Name);
         assert_eq!(SortOrder::Name.next(), SortOrder::Path);
         assert_eq!(SortOrder::Path.next(), SortOrder::SizeDesc);
+    }
+
+    fn make_artifact_with_safety(path: &str, rule_id: &str, category: Category, safety: SafetyLevel) -> ArtifactInfo {
+        ArtifactInfo {
+            safety,
+            ..make_artifact(path, rule_id, category)
+        }
+    }
+
+    #[test]
+    fn safety_filter_hides_non_matching() {
+        let mut tree = TreeState::default();
+        tree.add_artifact(make_artifact_with_safety("/tmp/a", "npm", Category::Dependencies, SafetyLevel::Safe));
+        tree.add_artifact(make_artifact_with_safety("/tmp/b", "cargo", Category::BuildOutput, SafetyLevel::Cautious));
+        tree.add_artifact(make_artifact_with_safety("/tmp/c", "venv", Category::VirtualEnv, SafetyLevel::Risky));
+
+        tree.safety_filter = SafetyFilter::Safe;
+        let rows = tree.visible_rows();
+        // Should show: Dependencies category, npm group, /tmp/a = 3 rows.
+        assert_eq!(rows.len(), 3, "expected 3 rows for safe filter, got {}", rows.len());
+
+        tree.safety_filter = SafetyFilter::Cautious;
+        let rows = tree.visible_rows();
+        assert_eq!(rows.len(), 3);
+
+        tree.safety_filter = SafetyFilter::All;
+        let rows = tree.visible_rows();
+        // All 3 categories, 3 groups, 3 artifacts = 9 rows.
+        assert_eq!(rows.len(), 9);
+    }
+
+    #[test]
+    fn safety_filter_cycles() {
+        assert_eq!(SafetyFilter::All.next(), SafetyFilter::Safe);
+        assert_eq!(SafetyFilter::Safe.next(), SafetyFilter::Cautious);
+        assert_eq!(SafetyFilter::Cautious.next(), SafetyFilter::Risky);
+        assert_eq!(SafetyFilter::Risky.next(), SafetyFilter::All);
     }
 }

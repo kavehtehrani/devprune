@@ -117,12 +117,16 @@ impl<'a> Widget for Footer<'a> {
             )])
         } else {
             let sort_label = self.app.tree.sort.label();
+            let safety_label = self.app.tree.safety_filter.label();
             let filter_label = self.app.tree.search_filter.as_deref().unwrap_or("");
-            let status_line = if filter_label.is_empty() {
-                format!(" sort:{sort_label} ")
-            } else {
-                format!(" sort:{sort_label}  filter:\"{filter_label}\" ")
-            };
+            let mut parts = vec![
+                format!("sort:{sort_label}"),
+                format!("safety:{safety_label}"),
+            ];
+            if !filter_label.is_empty() {
+                parts.push(format!("filter:\"{filter_label}\""));
+            }
+            let status_line = format!(" {} ", parts.join("  "));
             Line::from(vec![Span::styled(
                 status_line,
                 Style::default().fg(theme::FOOTER_FG),
@@ -163,6 +167,7 @@ fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
             ("d", "delete"),
             ("/", "search"),
             ("s", "sort"),
+            ("f", "safety"),
             ("t", "trash"),
             ("?", "help"),
             ("q", "quit"),

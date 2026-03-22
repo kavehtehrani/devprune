@@ -57,6 +57,11 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             app.tree.sort = app.tree.sort.next();
         }
 
+        // Safety filter
+        KeyCode::Char('f') => {
+            app.tree.safety_filter = app.tree.safety_filter.next();
+        }
+
         // Trash browser
         KeyCode::Char('t') => {
             open_trash_browser(app);
