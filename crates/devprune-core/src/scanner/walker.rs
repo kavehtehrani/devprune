@@ -172,6 +172,7 @@ fn run_scan(
                         path: path.clone(),
                         rule_id: rule.id.clone(),
                         rule_name: rule.name.clone(),
+                        rule_description: rule.description.clone(),
                         category: rule.category,
                         safety: rule.safety,
                         size: None,

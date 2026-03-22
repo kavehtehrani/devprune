@@ -1,29 +1,32 @@
-#![allow(dead_code)]
-
 use devprune_core::rules::types::{Category, SafetyLevel};
 use ratatui::style::Color;
 
 // ── General UI colours ────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub const BACKGROUND: Color = Color::Reset;
 pub const FOREGROUND: Color = Color::White;
 pub const DIMMED: Color = Color::Rgb(90, 90, 90);
 
 pub const BORDER: Color = Color::Rgb(60, 60, 60);
+#[allow(dead_code)]
 pub const BORDER_ACTIVE: Color = Color::Cyan;
 
 pub const HIGHLIGHT_BG: Color = Color::Rgb(40, 40, 60);
 pub const HIGHLIGHT_FG: Color = Color::White;
 
+#[allow(dead_code)]
 pub const HEADER_BG: Color = Color::Reset;
 pub const HEADER_FG: Color = Color::Cyan;
 
+#[allow(dead_code)]
 pub const FOOTER_BG: Color = Color::Reset;
 pub const FOOTER_FG: Color = Color::Rgb(180, 180, 180);
 pub const FOOTER_KEY_FG: Color = Color::Yellow;
 
 pub const SPINNER_FG: Color = Color::Cyan;
 pub const COMPLETE_FG: Color = Color::Green;
+#[allow(dead_code)]
 pub const ERROR_FG: Color = Color::Red;
 
 pub const DIALOG_BG: Color = Color::Reset;

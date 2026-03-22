@@ -14,6 +14,9 @@ pub struct ArtifactInfo {
     pub path: PathBuf,
     pub rule_id: String,
     pub rule_name: String,
+    /// Human-readable description of the rule, typically including restore
+    /// instructions (e.g. "Regenerate with `npm install`").
+    pub rule_description: String,
     pub category: Category,
     pub safety: SafetyLevel,
     pub size: Option<u64>,
@@ -134,6 +137,7 @@ mod tests {
             path: PathBuf::from("/home/user/project/node_modules"),
             rule_id: "npm-node-modules".to_string(),
             rule_name: "npm node_modules".to_string(),
+            rule_description: "Regenerate with `npm install`.".to_string(),
             category: Category::Dependencies,
             safety: SafetyLevel::Safe,
             size: Some(102_400),
@@ -158,6 +162,7 @@ mod tests {
             path: PathBuf::from("/tmp/target"),
             rule_id: "cargo-target".to_string(),
             rule_name: "Cargo target".to_string(),
+            rule_description: "Regenerate with `cargo build`.".to_string(),
             category: Category::BuildOutput,
             safety: SafetyLevel::Safe,
             size: None,

@@ -100,6 +100,14 @@ impl<'a> Widget for DetailsPanel<'a> {
             Style::default().fg(theme::DIMMED),
         )]));
 
+        if !art.rule_description.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                art.rule_description.clone(),
+                Style::default().fg(theme::FOREGROUND),
+            )]));
+        }
+
         lines.push(Line::from(""));
         lines.push(Line::from(vec![Span::styled(
             "Space: toggle  d: delete",

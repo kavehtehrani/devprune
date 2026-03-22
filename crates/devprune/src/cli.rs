@@ -38,6 +38,10 @@ pub struct Cli {
     #[arg(long)]
     pub json: bool,
 
+    /// Print only the summary line (count and total size per category), not individual artifacts
+    #[arg(long)]
+    pub stats_only: bool,
+
     /// Automatically select all artifacts and delete without prompting (requires --yes)
     #[arg(long)]
     pub auto: bool,

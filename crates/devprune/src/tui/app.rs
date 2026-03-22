@@ -834,6 +834,7 @@ mod tests {
             path: PathBuf::from(path),
             rule_id: rule_id.to_string(),
             rule_name: rule_id.to_string(),
+            rule_description: String::new(),
             category,
             safety: SafetyLevel::Safe,
             size: Some(1024),

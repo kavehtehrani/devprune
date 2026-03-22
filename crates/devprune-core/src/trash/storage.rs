@@ -5,7 +5,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::config::AppPaths;
-use crate::constants::{CONTENT_DIRNAME, METADATA_FILENAME};
+use crate::constants::{CONTENT_DIRNAME, EXDEV_ERROR_CODE, METADATA_FILENAME};
 use crate::error::{DevpruneError, Result};
 use crate::rules::types::Category;
 use crate::trash::metadata::{TrashEntryMetadata, TrashManifest, TrashManifestEntry};
@@ -209,7 +209,7 @@ fn move_path(src: &Path, dst: &Path) -> Result<()> {
 }
 
 fn is_cross_device(e: &std::io::Error) -> bool {
-    e.raw_os_error() == Some(18)
+    e.raw_os_error() == Some(EXDEV_ERROR_CODE)
 }
 
 /// Recursively copy `src` to `dst`, verify the counts and total size match,

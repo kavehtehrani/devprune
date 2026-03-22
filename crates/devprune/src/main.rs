@@ -13,7 +13,7 @@ use uuid::Uuid;
 use devprune_core::config::AppPaths;
 use devprune_core::rules::catalog::builtin_rules;
 use devprune_core::rules::parser::load_user_rules;
-use devprune_core::rules::types::{Category, SafetyLevel};
+use devprune_core::rules::types::{Category, Rule, SafetyLevel};
 use devprune_core::scanner::ScanCoordinator;
 use devprune_core::trash::storage::TrashManager;
 use devprune_core::types::{ArtifactInfo, ScanConfig, ScanEvent};
@@ -85,27 +85,23 @@ fn main() {
 }
 
 // ---------------------------------------------------------------------------
-// Headless scan
+// Shared scan helper
 // ---------------------------------------------------------------------------
 
-fn run_headless(cli: &Cli) -> anyhow::Result<()> {
-    let app_paths = AppPaths::resolve().ok_or_else(|| {
-        anyhow::anyhow!("could not resolve application data directories")
-    })?;
-
-    let scan_config = build_scan_config(cli, &app_paths)?;
-    let base_rules = load_user_rules(&app_paths.config_dir, builtin_rules()).unwrap_or_else(|e| {
-        if !cli.quiet {
-            eprintln!("warning: could not load user rules: {e}");
-        }
-        builtin_rules()
-    });
-    let rules = filter_rules(cli, base_rules);
-
-    let coordinator = ScanCoordinator::new(scan_config.clone(), rules, app_paths);
+/// Run the scan described by `config` and `rules` and return the collected
+/// artifacts together with the scan duration in milliseconds.
+///
+/// Handles: creating the coordinator, driving the event loop, applying size
+/// updates, and applying the optional `--min-size` filter.
+fn collect_scan_results(
+    config: ScanConfig,
+    rules: Vec<Rule>,
+    app_paths: AppPaths,
+    cli: &Cli,
+) -> anyhow::Result<(Vec<ArtifactInfo>, u128)> {
+    let coordinator = ScanCoordinator::new(config, rules, app_paths);
     let rx = coordinator.start();
 
-    // Collect all events until the scan completes.
     let mut artifacts: Vec<ArtifactInfo> = Vec::new();
     let mut size_updates: HashMap<Uuid, u64> = HashMap::new();
     let mut duration_ms = 0u128;
@@ -140,6 +136,29 @@ fn run_headless(cli: &Cli) -> anyhow::Result<()> {
         artifacts.retain(|a| a.size.map(|s| s >= min_bytes).unwrap_or(false));
     }
 
+    Ok((artifacts, duration_ms))
+}
+
+// ---------------------------------------------------------------------------
+// Headless scan
+// ---------------------------------------------------------------------------
+
+fn run_headless(cli: &Cli) -> anyhow::Result<()> {
+    let app_paths = AppPaths::resolve().ok_or_else(|| {
+        anyhow::anyhow!("could not resolve application data directories")
+    })?;
+
+    let scan_config = build_scan_config(cli, &app_paths)?;
+    let base_rules = load_user_rules(&app_paths.config_dir, builtin_rules()).unwrap_or_else(|e| {
+        if !cli.quiet {
+            eprintln!("warning: could not load user rules: {e}");
+        }
+        builtin_rules()
+    });
+    let rules = filter_rules(cli, base_rules);
+
+    let (artifacts, duration_ms) = collect_scan_results(scan_config, rules, app_paths, cli)?;
+
     if cli.json {
         print_json(cli, &artifacts, duration_ms)?;
     } else {
@@ -169,40 +188,8 @@ fn run_auto(cli: &Cli) -> anyhow::Result<()> {
     let mut rules = filter_rules(cli, base_rules);
     rules.retain(|r| r.safety == SafetyLevel::Safe);
 
-    let coordinator = ScanCoordinator::new(scan_config, rules, app_paths.clone());
-    let rx = coordinator.start();
-
-    let mut artifacts: Vec<ArtifactInfo> = Vec::new();
-    let mut size_updates: HashMap<Uuid, u64> = HashMap::new();
-    let mut duration_ms = 0u128;
-
-    for event in rx {
-        match event {
-            ScanEvent::Found(a) => artifacts.push(a),
-            ScanEvent::SizeUpdate { id, size } => {
-                size_updates.insert(id, size);
-            }
-            ScanEvent::Complete(summary) => {
-                duration_ms = summary.duration.as_millis();
-            }
-            ScanEvent::Error(e) => {
-                if !cli.quiet {
-                    eprintln!("warning: {e}");
-                }
-            }
-            ScanEvent::Progress(_) => {}
-        }
-    }
-
-    for artifact in &mut artifacts {
-        if let Some(&size) = size_updates.get(&artifact.id) {
-            artifact.size = Some(size);
-        }
-    }
-
-    if let Some(min_bytes) = parse_min_size(cli)? {
-        artifacts.retain(|a| a.size.map(|s| s >= min_bytes).unwrap_or(false));
-    }
+    let (artifacts, duration_ms) =
+        collect_scan_results(scan_config, rules, app_paths.clone(), cli)?;
 
     if artifacts.is_empty() {
         if !cli.quiet {
@@ -217,7 +204,7 @@ fn run_auto(cli: &Cli) -> anyhow::Result<()> {
         println!(
             "Found {} Safe artifact{} totalling {} in {}ms",
             artifacts.len(),
-            if artifacts.len() == 1 { "" } else { "s" },
+            plural(artifacts.len()),
             ByteSize(total_size),
             duration_ms,
         );
@@ -261,24 +248,22 @@ fn run_auto(cli: &Cli) -> anyhow::Result<()> {
                 println!(
                     "Deleted {} item{}, freed {}.",
                     trashed,
-                    if trashed == 1 { "" } else { "s" },
+                    plural(trashed),
                     ByteSize(freed),
                 );
             } else {
                 println!(
                     "Deleted {} item{}, freed {} ({} error{}).",
                     trashed,
-                    if trashed == 1 { "" } else { "s" },
+                    plural(trashed),
                     ByteSize(freed),
                     errors,
-                    if errors == 1 { "" } else { "s" },
+                    plural(errors),
                 );
             }
         }
-    } else {
-        if !cli.quiet {
-            println!("(dry-run: pass --yes to actually delete)");
-        }
+    } else if !cli.quiet {
+        println!("(dry-run: pass --yes to actually delete)");
     }
 
     Ok(())
@@ -388,6 +373,15 @@ fn parse_safety_level(s: &str) -> Option<SafetyLevel> {
 }
 
 // ---------------------------------------------------------------------------
+// Pluralization
+// ---------------------------------------------------------------------------
+
+/// Returns `""` when `count` is 1, otherwise `"s"`.
+fn plural(count: usize) -> &'static str {
+    if count == 1 { "" } else { "s" }
+}
+
+// ---------------------------------------------------------------------------
 // Output
 // ---------------------------------------------------------------------------
 
@@ -420,21 +414,23 @@ fn print_human(cli: &Cli, artifacts: &[ArtifactInfo], duration_ms: u128) {
             "\n{} ({} item{}, {})",
             cat.display_name(),
             group.len(),
-            if group.len() == 1 { "" } else { "s" },
+            plural(group.len()),
             ByteSize(group_size)
         );
-        println!("{}", "-".repeat(60));
-        for a in group.iter() {
-            let size_str = a
-                .size
-                .map(|s| ByteSize(s).to_string())
-                .unwrap_or_else(|| "?".to_string());
-            println!(
-                "  [{:<8}]  {}  {}",
-                a.safety.display_name(),
-                size_str,
-                a.path.display()
-            );
+        if !cli.stats_only {
+            println!("{}", "-".repeat(60));
+            for a in group.iter() {
+                let size_str = a
+                    .size
+                    .map(|s| ByteSize(s).to_string())
+                    .unwrap_or_else(|| "?".to_string());
+                println!(
+                    "  [{:<8}]  {}  {}",
+                    a.safety.display_name(),
+                    size_str,
+                    a.path.display()
+                );
+            }
         }
     }
 
@@ -442,7 +438,7 @@ fn print_human(cli: &Cli, artifacts: &[ArtifactInfo], duration_ms: u128) {
     println!(
         "Found {} artifact{} totalling {} in {}ms",
         artifacts.len(),
-        if artifacts.len() == 1 { "" } else { "s" },
+        plural(artifacts.len()),
         ByteSize(total_size),
         duration_ms
     );
@@ -583,7 +579,7 @@ fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
             println!(
                 "{} item{}, {} total",
                 items.len(),
-                if items.len() == 1 { "" } else { "s" },
+                plural(items.len()),
                 ByteSize(total)
             );
         }
@@ -611,8 +607,8 @@ fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
                     println!(
                         "Purged {} item{} older than {days} day{}.",
                         purged.len(),
-                        if purged.len() == 1 { "" } else { "s" },
-                        if days == 1 { "" } else { "s" },
+                        plural(purged.len()),
+                        plural(days as usize),
                     );
                 }
             } else {
@@ -631,7 +627,7 @@ fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
                     println!(
                         "Purged {} item{}.",
                         count,
-                        if count == 1 { "" } else { "s" }
+                        plural(count)
                     );
                 }
             }
@@ -642,7 +638,7 @@ fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
 }
 
 /// Parse a duration string of the form "Nd" (e.g. "30d", "7d") and return the
-/// number of days.  Returns `None` when the string cannot be parsed.
+/// number of days. Returns `None` when the string cannot be parsed.
 fn parse_duration_days(s: &str) -> Option<u64> {
     let s = s.trim();
     if s.ends_with('d') || s.ends_with('D') {

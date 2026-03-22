@@ -4,6 +4,11 @@ pub mod status_bar;
 pub mod theme;
 pub mod tree;
 
+/// Returns `""` when `count` is 1, otherwise `"s"`.
+pub(super) fn plural(count: usize) -> &'static str {
+    if count == 1 { "" } else { "s" }
+}
+
 use bytesize::ByteSize;
 use ratatui::{
     Frame,
@@ -85,7 +90,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
         format!(
             "trash: {} item{}, {} ",
             app.trash_stats.item_count,
-            if app.trash_stats.item_count == 1 { "" } else { "s" },
+            plural(app.trash_stats.item_count),
             ByteSize(app.trash_stats.total_bytes),
         )
     } else {
