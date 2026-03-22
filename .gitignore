@@ -1,2 +1,7 @@
 /.claude/
 /.idea/
+/target
+.DS_Store
+*.swp
+*.swo
+.superpowers/

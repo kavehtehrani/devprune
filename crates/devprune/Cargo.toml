@@ -1,0 +1,18 @@
+[package]
+name = "devprune"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "devprune"
+path = "src/main.rs"
+
+[dependencies]
+devprune-core = { workspace = true }
+ratatui = "0.30"
+crossterm = "0.29"
+clap = { version = "4", features = ["derive"] }
+log = { workspace = true }
+env_logger = "0.11"
+serde_json = { workspace = true }
+chrono = { workspace = true }
