@@ -7,6 +7,8 @@ pub mod tree;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
+    style::Style,
+    widgets::{Block, Borders},
 };
 
 use crate::tui::app::{App, AppMode};
@@ -21,6 +23,13 @@ use crate::tui::ui::{
 pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
     let area = frame.area();
 
+    // ── Outer block wrapping the entire UI ──────────────────────────────
+    let outer_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::BORDER));
+    let inner = outer_block.inner(area);
+    frame.render_widget(outer_block, area);
+
     // ── Main layout: header | body | footer ──────────────────────────────
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -29,7 +38,7 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
             Constraint::Min(0),    // body
             Constraint::Length(2), // footer
         ])
-        .split(area);
+        .split(inner);
 
     frame.render_widget(Header { app }, main_chunks[0]);
 
@@ -88,15 +97,14 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
     // ── Search query overlay in status bar ────────────────────────────────
     if let AppMode::Search { query } = &app.mode {
         let search_area = main_chunks[2];
-        // Render the live search prompt over the footer first line.
         let prompt = format!("/ {query}_");
-        use ratatui::style::Style;
         use ratatui::text::Line;
+        use ratatui::text::Span;
         use ratatui::widgets::Widget;
         use theme::{FOOTER_BG, FOOTER_KEY_FG};
         Line::from(vec![
-            ratatui::text::Span::styled(
-                format!(" Search: {prompt} "),
+            Span::styled(
+                format!(" search: {prompt} "),
                 Style::default().fg(FOOTER_KEY_FG).bg(FOOTER_BG),
             ),
         ])
