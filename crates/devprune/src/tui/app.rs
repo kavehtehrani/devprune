@@ -29,14 +29,6 @@ impl SortOrder {
             SortOrder::Path => SortOrder::SizeDesc,
         }
     }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            SortOrder::SizeDesc => "size↓",
-            SortOrder::Name => "name",
-            SortOrder::Path => "path",
-        }
-    }
 }
 
 // ── Safety filter ─────────────────────────────────────────────────────────────
@@ -67,10 +59,6 @@ impl SafetyFilter {
             SafetyFilter::Cautious => "cautious only",
             SafetyFilter::Risky => "risky only",
         }
-    }
-
-    pub fn is_active(self) -> bool {
-        !matches!(self, SafetyFilter::All)
     }
 
     /// Returns true when the given safety level should be visible under this
@@ -613,6 +601,7 @@ pub struct App {
     pub scan_complete: bool,
     pub scan_progress: ScanProgressState,
     pub should_quit: bool,
+    #[allow(dead_code)]
     pub app_paths: AppPaths,
     /// Incremented each tick to drive the spinner animation.
     pub tick_count: u64,
@@ -717,7 +706,6 @@ impl App {
 pub enum TrashSort {
     #[default]
     DateDesc,
-    DateAsc,
     SizeDesc,
     SizeAsc,
 }
@@ -728,14 +716,12 @@ impl TrashSort {
             Self::DateDesc => Self::SizeDesc,
             Self::SizeDesc => Self::SizeAsc,
             Self::SizeAsc => Self::DateDesc,
-            Self::DateAsc => Self::DateDesc,
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
             Self::DateDesc => "newest first",
-            Self::DateAsc => "oldest first",
             Self::SizeDesc => "largest first",
             Self::SizeAsc => "smallest first",
         }
@@ -779,10 +765,15 @@ impl TrashBrowserState {
         }
     }
 
+    pub fn select_all(&mut self, checked: bool) {
+        for v in &mut self.checked {
+            *v = checked;
+        }
+    }
+
     fn apply_sort(&self, items: &mut Vec<TrashManifestEntry>) {
         match self.sort {
             TrashSort::DateDesc => items.sort_by(|a, b| b.trashed_at.cmp(&a.trashed_at)),
-            TrashSort::DateAsc => items.sort_by(|a, b| a.trashed_at.cmp(&b.trashed_at)),
             TrashSort::SizeDesc => items.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes)),
             TrashSort::SizeAsc => items.sort_by(|a, b| a.size_bytes.cmp(&b.size_bytes)),
         }

@@ -193,6 +193,12 @@ fn handle_trash_browser(app: &mut App, key: KeyEvent) {
         KeyCode::Char(' ') => {
             app.trash_browser.toggle_check();
         }
+        KeyCode::Char('a') => {
+            app.trash_browser.select_all(true);
+        }
+        KeyCode::Char('A') => {
+            app.trash_browser.select_all(false);
+        }
         KeyCode::Char('s') => {
             app.trash_browser.cycle_sort();
         }

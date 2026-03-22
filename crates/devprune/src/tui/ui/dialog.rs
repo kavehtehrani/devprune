@@ -201,6 +201,8 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
     let hint_line = Line::from(vec![
         Span::styled(" Space", Style::default().fg(theme::FOOTER_KEY_FG)),
         Span::raw(":check "),
+        Span::styled("a/A", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":all/none "),
         Span::styled("s", Style::default().fg(theme::FOOTER_KEY_FG)),
         Span::raw(":sort "),
         Span::styled("r", Style::default().fg(theme::FOOTER_KEY_FG)),
