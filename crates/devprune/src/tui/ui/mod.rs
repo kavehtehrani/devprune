@@ -8,6 +8,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
     style::Style,
+    text::{Line, Span},
     widgets::{Block, Borders},
 };
 
@@ -15,7 +16,7 @@ use crate::tui::app::{App, AppMode};
 use crate::tui::ui::{
     details::DetailsPanel,
     dialog::{render_confirm_delete, render_help, render_trash_browser},
-    status_bar::{Footer, Header},
+    status_bar::render_header_content,
     tree::{TreeWidget, TreeWidgetState},
 };
 
@@ -23,49 +24,59 @@ use crate::tui::ui::{
 pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
     let area = frame.area();
 
-    // ── Outer block wrapping the entire UI ──────────────────────────────
-    let outer_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme::BORDER));
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
-
-    // ── Main layout: header | body | footer ──────────────────────────────
+    // ── Main layout: header block | body | footer block ─────────────────
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // header
+            Constraint::Length(3), // header block (border + 1 line + border)
             Constraint::Min(0),    // body
-            Constraint::Length(1), // footer
+            Constraint::Length(3), // footer block
         ])
-        .split(inner);
+        .split(area);
 
-    frame.render_widget(Header { app }, main_chunks[0]);
+    // ── Header block ────────────────────────────────────────────────────
+    let header_block = Block::default()
+        .title(" devprune ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::BORDER));
+    let header_inner = header_block.inner(main_chunks[0]);
+    frame.render_widget(header_block, main_chunks[0]);
+    render_header_content(frame, header_inner, app);
 
-    // ── Body: tree (65%) | details (35%) ─────────────────────────────────
+    // ── Body: tree (65%) | details (35%) ────────────────────────────────
     let body_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
         .split(main_chunks[1]);
 
-    // Build the tree panel title showing active filters.
-    let mut title_parts: Vec<String> = Vec::new();
+    // Build the artifacts block title and optional bottom title for filter status.
+    let tree_title = " artifacts ".to_string();
+    let mut bottom_parts: Vec<Span> = Vec::new();
     if app.tree.safety_filter.is_active() {
-        title_parts.push(format!("showing: {}", app.tree.safety_filter.label()));
+        let safety_color = match app.tree.safety_filter {
+            crate::tui::app::SafetyFilter::Safe => theme::safety_color(devprune_core::rules::types::SafetyLevel::Safe),
+            crate::tui::app::SafetyFilter::Cautious => theme::safety_color(devprune_core::rules::types::SafetyLevel::Cautious),
+            crate::tui::app::SafetyFilter::Risky => theme::safety_color(devprune_core::rules::types::SafetyLevel::Risky),
+            crate::tui::app::SafetyFilter::All => theme::FOOTER_FG,
+        };
+        bottom_parts.push(Span::styled(" showing: ", Style::default().fg(theme::DIMMED)));
+        bottom_parts.push(Span::styled(app.tree.safety_filter.label(), Style::default().fg(safety_color)));
+        bottom_parts.push(Span::raw(" "));
     }
     if let Some(ref q) = app.tree.search_filter {
-        title_parts.push(format!("search: \"{}\"", q));
+        bottom_parts.push(Span::styled(" search: ", Style::default().fg(theme::DIMMED)));
+        bottom_parts.push(Span::styled(format!("\"{}\"", q), Style::default().fg(theme::SPINNER_FG)));
+        bottom_parts.push(Span::raw(" "));
     }
-    let tree_title = if title_parts.is_empty() {
-        " artifacts ".to_string()
-    } else {
-        format!(" artifacts [{}] ", title_parts.join(" | "))
-    };
+    if let Some(ref msg) = app.status_message {
+        bottom_parts.push(Span::styled(format!(" {} ", msg), Style::default().fg(theme::COMPLETE_FG)));
+    }
 
     frame.render_stateful_widget(
         TreeWidget {
             tree: &app.tree,
             title: &tree_title,
+            bottom_title: if bottom_parts.is_empty() { None } else { Some(Line::from(bottom_parts)) },
         },
         body_chunks[0],
         tree_state,
@@ -78,9 +89,27 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         body_chunks[1],
     );
 
-    frame.render_widget(Footer { app }, main_chunks[2]);
+    // ── Footer block ────────────────────────────────────────────────────
+    let hints = status_bar::mode_hints(&app.mode);
+    let hint_spans: Vec<Span> = hints
+        .iter()
+        .flat_map(|(key, desc)| {
+            vec![
+                Span::raw(" "),
+                Span::styled(*key, Style::default().fg(theme::FOOTER_KEY_FG)),
+                Span::raw(":"),
+                Span::styled(*desc, Style::default().fg(theme::FOOTER_FG)),
+            ]
+        })
+        .collect();
 
-    // ── Overlay dialogs ───────────────────────────────────────────────────
+    let footer_block = Block::default()
+        .title(Line::from(hint_spans))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::BORDER));
+    frame.render_widget(footer_block, main_chunks[2]);
+
+    // ── Overlay dialogs ─────────────────────────────────────────────────
     match &app.mode {
         AppMode::ConfirmDelete => {
             render_confirm_delete(area, frame.buffer_mut(), app);
@@ -94,23 +123,16 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         AppMode::Normal | AppMode::Search { .. } => {}
     }
 
-    // ── Search query overlay in status bar ────────────────────────────────
+    // ── Search overlay ──────────────────────────────────────────────────
     if let AppMode::Search { query } = &app.mode {
-        let search_area = main_chunks[2];
-        let prompt = format!("/ {query}_");
-        use ratatui::text::Line;
-        use ratatui::text::Span;
-        use ratatui::widgets::Widget;
-        use theme::{FOOTER_BG, FOOTER_KEY_FG};
-        Line::from(vec![
-            Span::styled(
-                format!(" search: {prompt} "),
-                Style::default().fg(FOOTER_KEY_FG).bg(FOOTER_BG),
-            ),
-        ])
-        .render(
-            ratatui::layout::Rect::new(search_area.x, search_area.y, search_area.width, 1),
-            frame.buffer_mut(),
-        );
+        let prompt = format!(" search: / {query}_ ");
+        let search_line = Line::from(vec![
+            Span::styled(prompt, Style::default().fg(theme::FOOTER_KEY_FG)),
+        ]);
+        let search_block = Block::default()
+            .title(search_line)
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme::FOOTER_KEY_FG));
+        frame.render_widget(search_block, main_chunks[2]);
     }
 }

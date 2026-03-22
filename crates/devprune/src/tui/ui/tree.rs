@@ -7,6 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, StatefulWidget, Widget},
 };
 
+
 use crate::tui::app::{CheckState, RowRef, TreeState, VisibleRow};
 use crate::tui::ui::theme;
 
@@ -19,16 +20,21 @@ pub struct TreeWidgetState {
 pub struct TreeWidget<'a> {
     pub tree: &'a TreeState,
     pub title: &'a str,
+    pub bottom_title: Option<Line<'a>>,
 }
 
 impl<'a> StatefulWidget for TreeWidget<'a> {
     type State = TreeWidgetState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let block = Block::default()
+        let mut block = Block::default()
             .title(self.title)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(theme::BORDER));
+
+        if let Some(bt) = self.bottom_title {
+            block = block.title_bottom(bt);
+        }
 
         let inner = block.inner(area);
         block.render(area, buf);
