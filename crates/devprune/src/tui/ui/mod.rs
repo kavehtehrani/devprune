@@ -16,7 +16,7 @@ use ratatui::{
 use crate::tui::app::{App, AppMode};
 use crate::tui::ui::{
     details::DetailsPanel,
-    dialog::{render_confirm_delete, render_help, render_trash_browser},
+    dialog::{render_confirm_delete, render_confirm_quit, render_help, render_trash_browser},
     status_bar::render_header_content,
     tree::{TreeWidget, TreeWidgetState},
 };
@@ -139,6 +139,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
         }
         AppMode::TrashBrowser => {
             render_trash_browser(area, frame.buffer_mut(), &mut app.trash_browser);
+        }
+        AppMode::ConfirmQuit => {
+            render_confirm_quit(area, frame.buffer_mut(), app);
         }
         AppMode::Normal | AppMode::Search { .. } => {}
     }

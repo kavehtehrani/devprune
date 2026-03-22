@@ -616,6 +616,7 @@ pub enum AppMode {
     Normal,
     Search { query: String },
     ConfirmDelete,
+    ConfirmQuit,
     Help,
     TrashBrowser,
 }

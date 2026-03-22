@@ -59,6 +59,50 @@ pub fn render_confirm_delete(frame_area: Rect, buf: &mut Buffer, app: &App) {
         .render(inner, buf);
 }
 
+pub fn render_confirm_quit(frame_area: Rect, buf: &mut Buffer, app: &App) {
+    let dialog_width = 55u16.min(frame_area.width.saturating_sub(4));
+    let dialog_height = 7u16;
+    let area = centered_rect(dialog_width, dialog_height, frame_area);
+
+    Clear.render(area, buf);
+
+    let block = Block::default()
+        .title(" quit ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::DIALOG_BORDER))
+        .style(Style::default().bg(theme::DIALOG_BG));
+
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    let msg = format!(
+        "trash is not empty ({} item{}, {})",
+        app.trash_stats.item_count,
+        if app.trash_stats.item_count == 1 { "" } else { "s" },
+        ByteSize(app.trash_stats.total_bytes),
+    );
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(msg, Style::default().fg(theme::FOREGROUND))]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[t]", Style::default().fg(theme::FOOTER_KEY_FG)),
+            Span::raw(" open trash  "),
+            Span::styled("[q]", Style::default().fg(theme::FOOTER_KEY_FG)),
+            Span::raw(" quit anyway  "),
+            Span::styled("[Esc]", Style::default().fg(theme::FOOTER_KEY_FG)),
+            Span::raw(" cancel"),
+        ]),
+    ];
+
+    Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true })
+        .render(inner, buf);
+}
+
 pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
     let dialog_width = 60u16.min(frame_area.width.saturating_sub(4));
     let dialog_height = 26u16.min(frame_area.height.saturating_sub(4));
@@ -183,8 +227,8 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         return;
     }
 
-    // Reserve last line for the full path of the highlighted item.
-    let list_height = inner.height.saturating_sub(1) as usize;
+    // Reserve last two lines for the full path of the highlighted item.
+    let list_height = inner.height.saturating_sub(2) as usize;
     // Adjust scroll offset so cursor stays in view (same logic as tree widget).
     if state.cursor < state.scroll_offset {
         state.scroll_offset = state.cursor;
@@ -251,21 +295,32 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         Line::from(vec![cat_span]).render(Rect::new(x, y, cat_col as u16, 1), buf);
     }
 
-    // Full path of highlighted item on the last line.
+    // Full path of highlighted item on the last two lines.
     if let Some(entry) = state.items.get(state.cursor) {
-        let path_y = inner.y + inner.height.saturating_sub(1);
-        let full_path = format!(" {} ", entry.original_path.display());
-        // Truncate from the left if needed.
-        let max_w = inner.width as usize;
-        let display = if full_path.len() > max_w && max_w > 4 {
-            format!(" ...{} ", &full_path[full_path.len() - max_w + 5..])
+        let path_y = inner.y + inner.height.saturating_sub(2);
+        let full_path = entry.original_path.display().to_string();
+        let w = inner.width as usize;
+
+        // Split path across two lines if needed.
+        if full_path.len() <= w {
+            Line::from(vec![
+                Span::styled(format!(" {full_path}"), Style::default().fg(theme::SPINNER_FG)),
+            ])
+            .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
         } else {
-            full_path
-        };
-        Line::from(vec![
-            Span::styled(display, Style::default().fg(theme::SPINNER_FG)),
-        ])
-        .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
+            // First line: as much as fits
+            let split = w.min(full_path.len());
+            let line1 = &full_path[..split];
+            let line2 = &full_path[split..];
+            Line::from(vec![
+                Span::styled(format!(" {line1}"), Style::default().fg(theme::SPINNER_FG)),
+            ])
+            .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
+            Line::from(vec![
+                Span::styled(format!(" {line2}"), Style::default().fg(theme::SPINNER_FG)),
+            ])
+            .render(Rect::new(inner.x, path_y + 1, inner.width, 1), buf);
+        }
     }
 
     // Scrollbar when content overflows.

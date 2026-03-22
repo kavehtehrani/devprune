@@ -11,6 +11,7 @@ pub fn handle_input(app: &mut App, event: Event) {
         AppMode::Normal => handle_normal(app, key),
         AppMode::Search { query } => handle_search(app, key, query.clone()),
         AppMode::ConfirmDelete => handle_confirm_delete(app, key),
+        AppMode::ConfirmQuit => handle_confirm_quit(app, key),
         AppMode::Help => handle_help(app, key),
         AppMode::TrashBrowser => handle_trash_browser(app, key),
     }
@@ -79,10 +80,8 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         }
 
         // Quit
-        KeyCode::Char('q') => app.should_quit = true,
-        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.should_quit = true;
-        }
+        KeyCode::Char('q') => try_quit(app),
+        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => try_quit(app),
 
         _ => {}
     }
@@ -133,6 +132,32 @@ fn handle_confirm_delete(app: &mut App, key: KeyEvent) {
 fn handle_help(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') | KeyCode::Esc | KeyCode::Char('?') => {
+            app.mode = AppMode::Normal;
+        }
+        _ => {}
+    }
+}
+
+fn try_quit(app: &mut App) {
+    if app.trash_stats.item_count > 0 {
+        app.mode = AppMode::ConfirmQuit;
+    } else {
+        app.should_quit = true;
+    }
+}
+
+fn handle_confirm_quit(app: &mut App, key: KeyEvent) {
+    match key.code {
+        // Quit anyway
+        KeyCode::Char('q') | KeyCode::Char('y') => {
+            app.should_quit = true;
+        }
+        // Open trash browser
+        KeyCode::Char('t') => {
+            open_trash_browser(app);
+        }
+        // Cancel, go back
+        KeyCode::Esc | KeyCode::Char('n') => {
             app.mode = AppMode::Normal;
         }
         _ => {}

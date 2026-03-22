@@ -83,6 +83,11 @@ pub fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
             ("y/Enter", "confirm"),
             ("n/Esc", "cancel"),
         ],
+        AppMode::ConfirmQuit => vec![
+            ("t", "open trash"),
+            ("q", "quit anyway"),
+            ("Esc", "cancel"),
+        ],
         AppMode::Help => vec![
             ("q/Esc", "close"),
         ],
