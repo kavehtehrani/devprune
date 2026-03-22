@@ -21,6 +21,7 @@ pub struct TreeWidget<'a> {
     pub tree: &'a TreeState,
     pub title: &'a str,
     pub bottom_title: Option<Line<'a>>,
+    pub bottom_right: Option<Line<'a>>,
 }
 
 impl<'a> StatefulWidget for TreeWidget<'a> {
@@ -34,6 +35,9 @@ impl<'a> StatefulWidget for TreeWidget<'a> {
 
         if let Some(bt) = self.bottom_title {
             block = block.title_bottom(bt);
+        }
+        if let Some(br) = self.bottom_right {
+            block = block.title_bottom(br.alignment(ratatui::layout::Alignment::Right));
         }
 
         let inner = block.inner(area);
