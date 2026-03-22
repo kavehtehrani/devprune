@@ -48,9 +48,9 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         title_parts.push(format!("search: \"{}\"", q));
     }
     let tree_title = if title_parts.is_empty() {
-        " Artifacts ".to_string()
+        " artifacts ".to_string()
     } else {
-        format!(" Artifacts [{}] ", title_parts.join(" | "))
+        format!(" artifacts [{}] ", title_parts.join(" | "))
     };
 
     frame.render_stateful_widget(

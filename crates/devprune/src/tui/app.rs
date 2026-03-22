@@ -58,10 +58,10 @@ impl SafetyFilter {
 
     pub fn label(self) -> &'static str {
         match self {
-            SafetyFilter::All => "All",
-            SafetyFilter::Safe => "Safe only",
-            SafetyFilter::Cautious => "Cautious only",
-            SafetyFilter::Risky => "Risky only",
+            SafetyFilter::All => "all",
+            SafetyFilter::Safe => "safe only",
+            SafetyFilter::Cautious => "cautious only",
+            SafetyFilter::Risky => "risky only",
         }
     }
 

@@ -116,22 +116,31 @@ impl<'a> Widget for Footer<'a> {
                 Style::default().fg(theme::COMPLETE_FG),
             )])
         } else {
-            let mut parts: Vec<String> = Vec::new();
+            let mut spans: Vec<Span> = Vec::new();
             if self.app.tree.safety_filter.is_active() {
-                parts.push(format!("Showing: {}", self.app.tree.safety_filter.label()));
+                let safety_color = match self.app.tree.safety_filter {
+                    crate::tui::app::SafetyFilter::Safe => theme::safety_color(devprune_core::rules::types::SafetyLevel::Safe),
+                    crate::tui::app::SafetyFilter::Cautious => theme::safety_color(devprune_core::rules::types::SafetyLevel::Cautious),
+                    crate::tui::app::SafetyFilter::Risky => theme::safety_color(devprune_core::rules::types::SafetyLevel::Risky),
+                    crate::tui::app::SafetyFilter::All => theme::FOOTER_FG,
+                };
+                spans.push(Span::styled(" showing: ", Style::default().fg(theme::FOOTER_FG)));
+                spans.push(Span::styled(
+                    self.app.tree.safety_filter.label(),
+                    Style::default().fg(safety_color),
+                ));
             }
             if let Some(ref q) = self.app.tree.search_filter {
-                parts.push(format!("Search: \"{}\"", q));
+                if !spans.is_empty() {
+                    spans.push(Span::styled("  |  ", Style::default().fg(theme::DIMMED)));
+                }
+                spans.push(Span::styled(" search: ", Style::default().fg(theme::FOOTER_FG)));
+                spans.push(Span::styled(
+                    format!("\"{}\"", q),
+                    Style::default().fg(theme::SPINNER_FG),
+                ));
             }
-            let status_line = if parts.is_empty() {
-                String::new()
-            } else {
-                format!(" {} ", parts.join("  |  "))
-            };
-            Line::from(vec![Span::styled(
-                status_line,
-                Style::default().fg(theme::FOOTER_FG),
-            )])
+            Line::from(spans)
         };
         line1_content.render(Rect::new(area.x, area.y, area.width, 1), buf);
 
