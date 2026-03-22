@@ -21,3 +21,6 @@ bytesize = { workspace = true }
 dirs = { workspace = true }
 uuid = { workspace = true }
 anyhow = "1"
+
+[dev-dependencies]
+tempfile = { workspace = true }
