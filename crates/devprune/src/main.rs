@@ -1,4 +1,5 @@
 mod cli;
+mod tui;
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -22,8 +23,29 @@ fn main() {
     init_logger(cli.verbose, cli.quiet);
 
     if cli.use_tui() {
-        eprintln!("TUI mode not yet implemented");
-        std::process::exit(1);
+        let app_paths = match devprune_core::config::AppPaths::resolve() {
+            Some(p) => p,
+            None => {
+                eprintln!("error: could not resolve application data directories");
+                std::process::exit(1);
+            }
+        };
+        let scan_config = match build_scan_config(&cli, &app_paths) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        };
+        let rules = filter_rules(&cli, devprune_core::rules::catalog::builtin_rules());
+        match tui::run_tui(scan_config, rules, app_paths) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
+        return;
     }
 
     match run_headless(&cli) {
