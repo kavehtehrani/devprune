@@ -69,7 +69,13 @@ fn main() {
         return;
     }
 
-    match run_headless(&cli) {
+    let result = if cli.auto {
+        run_auto(&cli)
+    } else {
+        run_headless(&cli)
+    };
+
+    match result {
         Ok(()) => {}
         Err(e) => {
             eprintln!("error: {e}");
@@ -138,6 +144,141 @@ fn run_headless(cli: &Cli) -> anyhow::Result<()> {
         print_json(cli, &artifacts, duration_ms)?;
     } else {
         print_human(cli, &artifacts, duration_ms);
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Auto mode
+// ---------------------------------------------------------------------------
+
+fn run_auto(cli: &Cli) -> anyhow::Result<()> {
+    let app_paths = AppPaths::resolve().ok_or_else(|| {
+        anyhow::anyhow!("could not resolve application data directories")
+    })?;
+
+    let scan_config = build_scan_config(cli, &app_paths)?;
+    let base_rules = load_user_rules(&app_paths.config_dir, builtin_rules()).unwrap_or_else(|e| {
+        if !cli.quiet {
+            eprintln!("warning: could not load user rules: {e}");
+        }
+        builtin_rules()
+    });
+    // --auto always restricts to Safe artifacts regardless of other flags.
+    let mut rules = filter_rules(cli, base_rules);
+    rules.retain(|r| r.safety == SafetyLevel::Safe);
+
+    let coordinator = ScanCoordinator::new(scan_config, rules, app_paths.clone());
+    let rx = coordinator.start();
+
+    let mut artifacts: Vec<ArtifactInfo> = Vec::new();
+    let mut size_updates: HashMap<Uuid, u64> = HashMap::new();
+    let mut duration_ms = 0u128;
+
+    for event in rx {
+        match event {
+            ScanEvent::Found(a) => artifacts.push(a),
+            ScanEvent::SizeUpdate { id, size } => {
+                size_updates.insert(id, size);
+            }
+            ScanEvent::Complete(summary) => {
+                duration_ms = summary.duration.as_millis();
+            }
+            ScanEvent::Error(e) => {
+                if !cli.quiet {
+                    eprintln!("warning: {e}");
+                }
+            }
+            ScanEvent::Progress(_) => {}
+        }
+    }
+
+    for artifact in &mut artifacts {
+        if let Some(&size) = size_updates.get(&artifact.id) {
+            artifact.size = Some(size);
+        }
+    }
+
+    if let Some(min_bytes) = parse_min_size(cli)? {
+        artifacts.retain(|a| a.size.map(|s| s >= min_bytes).unwrap_or(false));
+    }
+
+    if artifacts.is_empty() {
+        if !cli.quiet {
+            println!("No Safe artifacts found.");
+        }
+        return Ok(());
+    }
+
+    let total_size: u64 = artifacts.iter().filter_map(|a| a.size).sum();
+
+    if !cli.quiet {
+        println!(
+            "Found {} Safe artifact{} totalling {} in {}ms",
+            artifacts.len(),
+            if artifacts.len() == 1 { "" } else { "s" },
+            ByteSize(total_size),
+            duration_ms,
+        );
+        for a in &artifacts {
+            let size_str = a.size.map(|s| ByteSize(s).to_string()).unwrap_or_else(|| "?".to_string());
+            println!("  {}  {}", size_str, a.path.display());
+        }
+    }
+
+    if cli.yes {
+        // Actually trash everything.
+        let trash_manager = TrashManager::new(app_paths)
+            .map_err(|e| anyhow::anyhow!("could not initialise trash: {e}"))?;
+
+        let mut trashed = 0usize;
+        let mut freed = 0u64;
+        let mut errors = 0usize;
+
+        for artifact in &artifacts {
+            match trash_manager.trash_item(
+                &artifact.path,
+                artifact.size.unwrap_or(0),
+                &artifact.rule_id,
+                artifact.category,
+            ) {
+                Ok(_) => {
+                    trashed += 1;
+                    freed += artifact.size.unwrap_or(0);
+                }
+                Err(e) => {
+                    if !cli.quiet {
+                        eprintln!("warning: failed to trash {}: {e}", artifact.path.display());
+                    }
+                    errors += 1;
+                }
+            }
+        }
+
+        if !cli.quiet {
+            if errors == 0 {
+                println!(
+                    "Deleted {} item{}, freed {}.",
+                    trashed,
+                    if trashed == 1 { "" } else { "s" },
+                    ByteSize(freed),
+                );
+            } else {
+                println!(
+                    "Deleted {} item{}, freed {} ({} error{}).",
+                    trashed,
+                    if trashed == 1 { "" } else { "s" },
+                    ByteSize(freed),
+                    errors,
+                    if errors == 1 { "" } else { "s" },
+                );
+            }
+        }
+    } else {
+        if !cli.quiet {
+            println!("(dry-run: pass --yes to actually delete)");
+        }
     }
 
     Ok(())
