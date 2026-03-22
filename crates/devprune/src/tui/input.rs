@@ -150,6 +150,12 @@ fn handle_trash_browser(app: &mut App, key: KeyEvent) {
         KeyCode::Char('k') | KeyCode::Up => {
             app.trash_browser.move_cursor(-1);
         }
+        KeyCode::PageDown => {
+            app.trash_browser.move_cursor(10);
+        }
+        KeyCode::PageUp => {
+            app.trash_browser.move_cursor(-10);
+        }
         KeyCode::Char(' ') => {
             app.trash_browser.toggle_check();
         }

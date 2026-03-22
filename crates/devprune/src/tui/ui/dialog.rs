@@ -182,38 +182,62 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
         0
     };
 
-    let mut lines: Vec<Line> = Vec::new();
+    // Fixed column widths: checkbox(5) + path(flexible) + size(10) + category(18)
+    let w = inner.width as usize;
+    let check_col = 5;   // " [x] "
+    let size_col = 10;   // "  1.3 GiB "
+    let cat_col = 18;    // " Build Output      "
+    let path_col = w.saturating_sub(check_col + size_col + cat_col);
+
     for (i, entry) in state.items.iter().enumerate().skip(offset).take(list_height) {
+        let y = inner.y + (i - offset) as u16;
+        if y >= inner.y + inner.height {
+            break;
+        }
+
         let checked = state.checked.get(i).copied().unwrap_or(false);
-        let check_sym = if checked { "[x]" } else { "[ ]" };
+        let check_sym = if checked { "[x] " } else { "[ ] " };
         let check_color = if checked { theme::CHECKBOX_CHECKED } else { theme::CHECKBOX_EMPTY };
         let is_cursor = i == state.cursor;
+        let row_bg = if is_cursor { theme::HIGHLIGHT_BG } else { theme::DIALOG_BG };
+
+        // Clear the row
+        for col in inner.x..(inner.x + inner.width) {
+            buf[(col, y)].set_style(Style::default().bg(row_bg)).set_char(' ');
+        }
+
         let path_str = entry.original_path.display().to_string();
-        // Truncate long paths.
-        let max_path = inner.width.saturating_sub(30) as usize;
-        let path_display = if path_str.len() > max_path && max_path > 3 {
-            format!("...{}", &path_str[path_str.len() - max_path + 3..])
+        let path_display = if path_str.len() > path_col && path_col > 3 {
+            format!("...{}", &path_str[path_str.len() - path_col + 3..])
         } else {
             path_str
         };
-        let size_str = ByteSize(entry.size_bytes).to_string();
-        let row_bg = if is_cursor { theme::HIGHLIGHT_BG } else { theme::DIALOG_BG };
 
-        let line = Line::from(vec![
-            Span::styled(format!(" {check_sym} "), Style::default().fg(check_color).bg(row_bg)),
-            Span::styled(format!("{:<42} ", path_display), Style::default().fg(theme::FOREGROUND).bg(row_bg)),
-            Span::styled(format!("{:>9} ", size_str), Style::default().fg(theme::SIZE_FG).bg(row_bg)),
-            Span::styled(
-                entry.category.display_name(),
-                Style::default().fg(theme::DIMMED).bg(row_bg),
-            ),
-        ]);
-        lines.push(line);
+        let size_str = format!("{:>9}", ByteSize(entry.size_bytes));
+        let cat_str = entry.category.display_name();
+
+        // Render each column at fixed positions
+        let mut x = inner.x;
+
+        // Checkbox
+        let check_span = Span::styled(format!(" {check_sym}"), Style::default().fg(check_color).bg(row_bg));
+        Line::from(vec![check_span]).render(Rect::new(x, y, check_col as u16, 1), buf);
+        x += check_col as u16;
+
+        // Path
+        let path_span = Span::styled(path_display, Style::default().fg(theme::FOREGROUND).bg(row_bg));
+        Line::from(vec![path_span]).render(Rect::new(x, y, path_col as u16, 1), buf);
+        x += path_col as u16;
+
+        // Size (right-aligned within its column)
+        let size_span = Span::styled(size_str, Style::default().fg(theme::SIZE_FG).bg(row_bg));
+        Line::from(vec![size_span]).render(Rect::new(x, y, size_col as u16, 1), buf);
+        x += size_col as u16;
+
+        // Category
+        let cat_span = Span::styled(format!(" {cat_str}"), Style::default().fg(theme::DIMMED).bg(row_bg));
+        Line::from(vec![cat_span]).render(Rect::new(x, y, cat_col as u16, 1), buf);
     }
-
-    Paragraph::new(lines)
-        .wrap(Wrap { trim: false })
-        .render(inner, buf);
 
     // Scrollbar when content overflows.
     let total_items = state.items.len();
