@@ -77,15 +77,8 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
     block.render(area, buf);
 
     let bindings: &[(&str, &str)] = &[
-        ("Navigation", ""),
-        ("  j / Down", "Move cursor down"),
-        ("  k / Up", "Move cursor up"),
-        ("  PgDn / PgUp", "Move 10 rows"),
-        ("", ""),
         ("Selection", ""),
         ("  Space / Enter", "Toggle item check"),
-        ("  l / Right", "Expand node"),
-        ("  h / Left", "Collapse node (or jump to parent)"),
         ("  a", "Select all"),
         ("  A", "Deselect all"),
         ("", ""),
@@ -93,6 +86,7 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
         ("  d", "Delete selected items"),
         ("  /", "Filter / search"),
         ("  s", "Cycle sort order"),
+        ("  f", "Filter by safety level"),
         ("  t", "Open trash browser"),
         ("", ""),
         ("General", ""),

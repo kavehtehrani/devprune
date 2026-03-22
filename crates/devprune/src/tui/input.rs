@@ -31,11 +31,11 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         }
 
         // Expand / collapse tree nodes
-        KeyCode::Right | KeyCode::Char('l') => {
+        KeyCode::Right => {
             let cursor = app.tree.cursor;
             app.tree.expand(cursor);
         }
-        KeyCode::Left | KeyCode::Char('h') => {
+        KeyCode::Left => {
             let cursor = app.tree.cursor;
             app.tree.collapse(cursor);
         }
