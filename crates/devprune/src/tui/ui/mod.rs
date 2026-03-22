@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, Widget},
 };
 
 use crate::tui::app::{App, AppMode};
@@ -31,7 +31,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
         .constraints([
             Constraint::Length(3), // header block
             Constraint::Min(0),    // body (tree + details)
-            Constraint::Length(3), // footer block
+            Constraint::Length(4), // footer block (border + 2 lines for wrapping + border)
         ])
         .split(area);
 
@@ -124,10 +124,14 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
         .collect();
 
     let footer_block = Block::default()
-        .title(Line::from(hint_spans))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme::BORDER));
+    let footer_inner = footer_block.inner(main_chunks[2]);
     frame.render_widget(footer_block, main_chunks[2]);
+    use ratatui::widgets::Paragraph;
+    Paragraph::new(Line::from(hint_spans))
+        .wrap(ratatui::widgets::Wrap { trim: false })
+        .render(footer_inner, frame.buffer_mut());
 
     // ── Overlay dialogs ─────────────────────────────────────────────────
     match &app.mode {
@@ -146,15 +150,18 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
         AppMode::Normal | AppMode::Search { .. } => {}
     }
 
-    // ── Search overlay (replaces footer) ────────────────────────────────
+    // ── Search overlay (replaces footer content) ──────────────────────
     if let AppMode::Search { query } = &app.mode {
-        let prompt = format!(" search: / {query}_ ");
+        let prompt = format!("/ {query}_");
         let search_block = Block::default()
-            .title(Line::from(vec![
-                Span::styled(prompt, Style::default().fg(theme::FOOTER_KEY_FG)),
-            ]))
+            .title(" search ")
             .borders(Borders::ALL)
             .border_style(Style::default().fg(theme::FOOTER_KEY_FG));
+        let search_inner = search_block.inner(main_chunks[2]);
         frame.render_widget(search_block, main_chunks[2]);
+        ratatui::widgets::Paragraph::new(Line::from(vec![
+            Span::styled(prompt, Style::default().fg(theme::FOOTER_KEY_FG)),
+        ]))
+        .render(search_inner, frame.buffer_mut());
     }
 }
