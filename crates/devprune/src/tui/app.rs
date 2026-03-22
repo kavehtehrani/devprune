@@ -531,6 +531,17 @@ impl TreeState {
             cat.total_size = cat.children.iter().map(|g| g.total_size).sum();
         }
         self.categories.retain(|c| !c.children.is_empty());
+
+        // Refresh check states on all remaining nodes so no stale [~] lingers.
+        let cat_count = self.categories.len();
+        for ci in 0..cat_count {
+            let grp_count = self.categories[ci].children.len();
+            for gi in 0..grp_count {
+                self.refresh_group_check(ci, gi);
+            }
+            self.refresh_category_check(ci);
+        }
+
         // Rebuild the index.
         self.index.clear();
         for (ci, cat) in self.categories.iter().enumerate() {
