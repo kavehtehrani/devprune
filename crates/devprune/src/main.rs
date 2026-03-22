@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use devprune_core::config::AppPaths;
 use devprune_core::rules::catalog::builtin_rules;
+use devprune_core::rules::parser::load_user_rules;
 use devprune_core::rules::types::{Category, SafetyLevel};
 use devprune_core::scanner::ScanCoordinator;
 use devprune_core::trash::storage::TrashManager;
@@ -50,7 +51,14 @@ fn main() {
                 std::process::exit(1);
             }
         };
-        let rules = filter_rules(&cli, devprune_core::rules::catalog::builtin_rules());
+        let base_rules = match load_user_rules(&app_paths.config_dir, builtin_rules()) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("warning: could not load user rules: {e}");
+                builtin_rules()
+            }
+        };
+        let rules = filter_rules(&cli, base_rules);
         match tui::run_tui(scan_config, rules, app_paths) {
             Ok(()) => {}
             Err(e) => {
@@ -80,7 +88,13 @@ fn run_headless(cli: &Cli) -> anyhow::Result<()> {
     })?;
 
     let scan_config = build_scan_config(cli, &app_paths)?;
-    let rules = filter_rules(cli, builtin_rules());
+    let base_rules = load_user_rules(&app_paths.config_dir, builtin_rules()).unwrap_or_else(|e| {
+        if !cli.quiet {
+            eprintln!("warning: could not load user rules: {e}");
+        }
+        builtin_rules()
+    });
+    let rules = filter_rules(cli, base_rules);
 
     let coordinator = ScanCoordinator::new(scan_config.clone(), rules, app_paths);
     let rx = coordinator.start();
