@@ -132,10 +132,17 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
 
     Clear.render(area, buf);
 
-    let title = format!(" trash ({} item{}) ", state.items.len(), if state.items.len() == 1 { "" } else { "s" });
+    let title = format!(
+        " trash ({} item{}, {}) ",
+        state.items.len(),
+        if state.items.len() == 1 { "" } else { "s" },
+        state.sort.label(),
+    );
     let hint_line = Line::from(vec![
         Span::styled(" Space", Style::default().fg(theme::FOOTER_KEY_FG)),
         Span::raw(":check "),
+        Span::styled("s", Style::default().fg(theme::FOOTER_KEY_FG)),
+        Span::raw(":sort "),
         Span::styled("r", Style::default().fg(theme::FOOTER_KEY_FG)),
         Span::raw(":restore "),
         Span::styled("p", Style::default().fg(theme::FOOTER_KEY_FG)),
@@ -182,12 +189,13 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
         0
     };
 
-    // Fixed column widths: checkbox(5) + path(flexible) + size(10) + category(18)
+    // Fixed column widths: checkbox(5) + path(flexible) + gap(1) + size(10) + category(18)
     let w = inner.width as usize;
     let check_col = 5;   // " [x] "
+    let gap = 1;          // space between path and size
     let size_col = 10;   // "  1.3 GiB "
     let cat_col = 18;    // " Build Output      "
-    let path_col = w.saturating_sub(check_col + size_col + cat_col);
+    let path_col = w.saturating_sub(check_col + gap + size_col + cat_col);
 
     for (i, entry) in state.items.iter().enumerate().skip(offset).take(list_height) {
         let y = inner.y + (i - offset) as u16;
@@ -224,10 +232,10 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
         Line::from(vec![check_span]).render(Rect::new(x, y, check_col as u16, 1), buf);
         x += check_col as u16;
 
-        // Path
+        // Path + gap
         let path_span = Span::styled(path_display, Style::default().fg(theme::FOREGROUND).bg(row_bg));
         Line::from(vec![path_span]).render(Rect::new(x, y, path_col as u16, 1), buf);
-        x += path_col as u16;
+        x += (path_col + gap) as u16;
 
         // Size (right-aligned within its column)
         let size_span = Span::styled(size_str, Style::default().fg(theme::SIZE_FG).bg(row_bg));

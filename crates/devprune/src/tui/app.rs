@@ -697,19 +697,77 @@ impl App {
 
 // ── TrashBrowserState ─────────────────────────────────────────────────────────
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TrashSort {
+    #[default]
+    DateDesc,
+    DateAsc,
+    SizeDesc,
+    SizeAsc,
+}
+
+impl TrashSort {
+    pub fn next(self) -> Self {
+        match self {
+            Self::DateDesc => Self::SizeDesc,
+            Self::SizeDesc => Self::SizeAsc,
+            Self::SizeAsc => Self::DateDesc,
+            Self::DateAsc => Self::DateDesc,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::DateDesc => "newest first",
+            Self::DateAsc => "oldest first",
+            Self::SizeDesc => "largest first",
+            Self::SizeAsc => "smallest first",
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct TrashBrowserState {
     pub items: Vec<TrashManifestEntry>,
     pub cursor: usize,
     pub checked: Vec<bool>,
+    pub sort: TrashSort,
 }
 
 impl TrashBrowserState {
-    pub fn load(&mut self, items: Vec<TrashManifestEntry>) {
+    pub fn load(&mut self, mut items: Vec<TrashManifestEntry>) {
+        self.apply_sort(&mut items);
         let len = items.len();
         self.items = items;
         self.checked = vec![false; len];
         self.cursor = 0;
+    }
+
+    pub fn cycle_sort(&mut self) {
+        self.sort = self.sort.next();
+        let mut items = std::mem::take(&mut self.items);
+        self.apply_sort(&mut items);
+        // Preserve checked state by rebuilding from ids
+        let checked_ids: std::collections::HashSet<uuid::Uuid> = self.items.iter()
+            .enumerate()
+            .filter(|(i, _)| self.checked.get(*i).copied().unwrap_or(false))
+            .map(|(_, e)| e.id)
+            .collect();
+        let len = items.len();
+        self.items = items;
+        self.checked = self.items.iter().map(|e| checked_ids.contains(&e.id)).collect();
+        if len > 0 {
+            self.cursor = self.cursor.min(len - 1);
+        }
+    }
+
+    fn apply_sort(&self, items: &mut Vec<TrashManifestEntry>) {
+        match self.sort {
+            TrashSort::DateDesc => items.sort_by(|a, b| b.trashed_at.cmp(&a.trashed_at)),
+            TrashSort::DateAsc => items.sort_by(|a, b| a.trashed_at.cmp(&b.trashed_at)),
+            TrashSort::SizeDesc => items.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes)),
+            TrashSort::SizeAsc => items.sort_by(|a, b| a.size_bytes.cmp(&b.size_bytes)),
+        }
     }
 
     pub fn move_cursor(&mut self, delta: i64) {

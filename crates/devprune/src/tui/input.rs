@@ -159,6 +159,9 @@ fn handle_trash_browser(app: &mut App, key: KeyEvent) {
         KeyCode::Char(' ') => {
             app.trash_browser.toggle_check();
         }
+        KeyCode::Char('s') => {
+            app.trash_browser.cycle_sort();
+        }
         KeyCode::Char('r') => {
             perform_trash_restore(app);
         }
