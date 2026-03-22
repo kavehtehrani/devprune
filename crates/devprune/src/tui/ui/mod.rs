@@ -36,7 +36,7 @@ pub fn draw(frame: &mut Frame, app: &App, tree_state: &mut TreeWidgetState) {
         .constraints([
             Constraint::Length(1), // header
             Constraint::Min(0),    // body
-            Constraint::Length(2), // footer
+            Constraint::Length(1), // footer
         ])
         .split(inner);
 

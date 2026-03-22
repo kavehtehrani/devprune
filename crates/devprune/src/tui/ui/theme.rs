@@ -15,10 +15,10 @@ pub const BORDER_ACTIVE: Color = Color::Cyan;
 pub const HIGHLIGHT_BG: Color = Color::Rgb(40, 40, 60);
 pub const HIGHLIGHT_FG: Color = Color::White;
 
-pub const HEADER_BG: Color = Color::Rgb(25, 25, 40);
+pub const HEADER_BG: Color = Color::Reset;
 pub const HEADER_FG: Color = Color::Cyan;
 
-pub const FOOTER_BG: Color = Color::Rgb(25, 25, 40);
+pub const FOOTER_BG: Color = Color::Reset;
 pub const FOOTER_FG: Color = Color::Rgb(180, 180, 180);
 pub const FOOTER_KEY_FG: Color = Color::Yellow;
 
@@ -26,7 +26,7 @@ pub const SPINNER_FG: Color = Color::Cyan;
 pub const COMPLETE_FG: Color = Color::Green;
 pub const ERROR_FG: Color = Color::Red;
 
-pub const DIALOG_BG: Color = Color::Rgb(30, 30, 45);
+pub const DIALOG_BG: Color = Color::Reset;
 pub const DIALOG_BORDER: Color = Color::Yellow;
 pub const DIALOG_TITLE: Color = Color::White;
 

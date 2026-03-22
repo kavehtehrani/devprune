@@ -100,21 +100,12 @@ pub struct Footer<'a> {
 
 impl<'a> Widget for Footer<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Clear both footer lines.
-        for row in area.y..(area.y + area.height) {
-            for col in area.x..(area.x + area.width) {
-                buf[(col, row)]
-                    .set_style(Style::default().bg(theme::FOOTER_BG).fg(theme::FOOTER_FG))
-                    .set_char(' ');
-            }
-        }
-
-        // Line 1: sort / filter status, or a transient status message.
-        let line1_content = if let Some(ref msg) = self.app.status_message {
-            Line::from(vec![Span::styled(
+        // Build the status line (filter info or transient message). May be empty.
+        let status_line: Option<Line> = if let Some(ref msg) = self.app.status_message {
+            Some(Line::from(vec![Span::styled(
                 format!(" {msg} "),
                 Style::default().fg(theme::COMPLETE_FG),
-            )])
+            )]))
         } else {
             let mut spans: Vec<Span> = Vec::new();
             if self.app.tree.safety_filter.is_active() {
@@ -140,15 +131,10 @@ impl<'a> Widget for Footer<'a> {
                     Style::default().fg(theme::SPINNER_FG),
                 ));
             }
-            Line::from(spans)
+            if spans.is_empty() { None } else { Some(Line::from(spans)) }
         };
-        line1_content.render(Rect::new(area.x, area.y, area.width, 1), buf);
 
-        if area.height < 2 {
-            return;
-        }
-
-        // Line 2: context-sensitive hints.
+        // Key hints line.
         let hints = mode_hints(&self.app.mode);
         let hint_spans: Vec<Span> = hints
             .iter()
@@ -161,9 +147,21 @@ impl<'a> Widget for Footer<'a> {
                 ]
             })
             .collect();
+        let hints_line = Line::from(hint_spans);
 
-        Line::from(hint_spans)
-            .render(Rect::new(area.x, area.y + 1, area.width, 1), buf);
+        // Render: if we have a status line, use both rows. Otherwise just hints.
+        match status_line {
+            Some(sl) => {
+                sl.render(Rect::new(area.x, area.y, area.width, 1), buf);
+                if area.height >= 2 {
+                    hints_line.render(Rect::new(area.x, area.y + 1, area.width, 1), buf);
+                }
+            }
+            None => {
+                // Put hints on the first row, no blank line.
+                hints_line.render(Rect::new(area.x, area.y, area.width, 1), buf);
+            }
+        }
     }
 }
 
