@@ -14,13 +14,26 @@ use devprune_core::config::AppPaths;
 use devprune_core::rules::catalog::builtin_rules;
 use devprune_core::rules::types::{Category, SafetyLevel};
 use devprune_core::scanner::ScanCoordinator;
+use devprune_core::trash::storage::TrashManager;
 use devprune_core::types::{ArtifactInfo, ScanConfig, ScanEvent};
 
-use cli::Cli;
+use cli::{Cli, TrashAction, TrashCommand};
 
 fn main() {
     let cli = Cli::parse();
     init_logger(cli.verbose, cli.quiet);
+
+    // Handle trash subcommands before anything else.
+    if let Some(TrashCommand::Trash { ref action }) = cli.trash {
+        match run_trash_command(action, &cli) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
 
     if cli.use_tui() {
         let app_paths = match devprune_core::config::AppPaths::resolve() {
@@ -372,6 +385,117 @@ fn print_json(cli: &Cli, artifacts: &[ArtifactInfo], duration_ms: u128) -> anyho
     writeln!(handle)?;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Trash CLI commands
+// ---------------------------------------------------------------------------
+
+fn run_trash_command(action: &TrashAction, cli: &Cli) -> anyhow::Result<()> {
+    let app_paths = AppPaths::resolve()
+        .ok_or_else(|| anyhow::anyhow!("could not resolve application data directories"))?;
+    let trash_manager = TrashManager::new(app_paths)
+        .map_err(|e| anyhow::anyhow!("could not initialise trash: {e}"))?;
+
+    match action {
+        TrashAction::List => {
+            let items = trash_manager
+                .list_items()
+                .map_err(|e| anyhow::anyhow!("failed to list trash: {e}"))?;
+
+            if items.is_empty() {
+                println!("Trash is empty.");
+                return Ok(());
+            }
+
+            println!(
+                "{:<36}  {:<9}  {:<20}  {:<18}  {}",
+                "ID", "Size", "Trashed At", "Category", "Original Path"
+            );
+            println!("{}", "-".repeat(110));
+            for item in &items {
+                println!(
+                    "{:<36}  {:>9}  {:<20}  {:<18}  {}",
+                    item.id,
+                    ByteSize(item.size_bytes).to_string(),
+                    item.trashed_at.format("%Y-%m-%d %H:%M UTC"),
+                    item.category.display_name(),
+                    item.original_path.display(),
+                );
+            }
+            println!();
+            let total: u64 = items.iter().map(|i| i.size_bytes).sum();
+            println!(
+                "{} item{}, {} total",
+                items.len(),
+                if items.len() == 1 { "" } else { "s" },
+                ByteSize(total)
+            );
+        }
+
+        TrashAction::Restore { id } => {
+            let uuid: Uuid = id
+                .parse()
+                .map_err(|_| anyhow::anyhow!("invalid UUID: {id}"))?;
+            let restored = trash_manager
+                .restore_item(uuid)
+                .map_err(|e| anyhow::anyhow!("restore failed: {e}"))?;
+            if !cli.quiet {
+                println!("Restored to {}", restored.display());
+            }
+        }
+
+        TrashAction::Purge { older_than } => {
+            if let Some(duration_str) = older_than {
+                let days = parse_duration_days(duration_str)
+                    .ok_or_else(|| anyhow::anyhow!("invalid duration: {duration_str} (expected e.g. 30d)"))?;
+                let purged = trash_manager
+                    .purge_older_than(days)
+                    .map_err(|e| anyhow::anyhow!("purge failed: {e}"))?;
+                if !cli.quiet {
+                    println!(
+                        "Purged {} item{} older than {days} day{}.",
+                        purged.len(),
+                        if purged.len() == 1 { "" } else { "s" },
+                        if days == 1 { "" } else { "s" },
+                    );
+                }
+            } else {
+                // Purge everything.
+                let items = trash_manager
+                    .list_items()
+                    .map_err(|e| anyhow::anyhow!("failed to list trash: {e}"))?;
+                let mut count = 0usize;
+                for item in &items {
+                    trash_manager
+                        .purge_item(item.id)
+                        .map_err(|e| anyhow::anyhow!("purge failed for {}: {e}", item.id))?;
+                    count += 1;
+                }
+                if !cli.quiet {
+                    println!(
+                        "Purged {} item{}.",
+                        count,
+                        if count == 1 { "" } else { "s" }
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Parse a duration string of the form "Nd" (e.g. "30d", "7d") and return the
+/// number of days.  Returns `None` when the string cannot be parsed.
+fn parse_duration_days(s: &str) -> Option<u64> {
+    let s = s.trim();
+    if s.ends_with('d') || s.ends_with('D') {
+        s[..s.len() - 1].parse::<u64>().ok()
+    } else {
+        // Allow bare numbers too (treat as days).
+        s.parse::<u64>().ok()
+    }
 }
 
 // ---------------------------------------------------------------------------
