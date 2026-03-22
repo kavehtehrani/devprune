@@ -74,6 +74,11 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             open_trash_browser(app);
         }
 
+        // Rescan
+        KeyCode::Char('R') => {
+            app.rescan_requested = true;
+        }
+
         // Help
         KeyCode::Char('?') => {
             app.mode = AppMode::Help;

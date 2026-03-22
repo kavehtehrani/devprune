@@ -32,19 +32,39 @@ pub fn run_tui(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths) -> any
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // ── Start scan ────────────────────────────────────────────────────────
-    let coordinator = ScanCoordinator::new(config, rules, app_paths.clone());
-    let scan_rx = coordinator.start();
-
     // ── Trash manager ─────────────────────────────────────────────────────
     let trash_manager = TrashManager::new(app_paths.clone()).ok();
 
     // ── App state ─────────────────────────────────────────────────────────
-    let mut app = App::new(app_paths, trash_manager);
+    let mut app = App::new(app_paths.clone(), trash_manager);
     let mut tree_state = TreeWidgetState::default();
 
-    // ── Event loop ────────────────────────────────────────────────────────
-    let result = run_loop(&mut terminal, &mut app, &mut tree_state, scan_rx);
+    // ── Start initial scan ────────────────────────────────────────────────
+    let coordinator = ScanCoordinator::new(config.clone(), rules.clone(), app_paths.clone());
+    let mut scan_rx = coordinator.start();
+
+    // ── Event loop (supports rescan) ──────────────────────────────────────
+    let result = loop {
+        terminal.draw(|f| draw(f, &mut app, &mut tree_state))?;
+
+        match next_event(&scan_rx) {
+            Some(AppEvent::Input(event)) => handle_input(&mut app, event),
+            Some(AppEvent::Scan(ev)) => handle_scan_event(&mut app, ev),
+            Some(AppEvent::Tick) => app.on_tick(),
+            None => {}
+        }
+
+        if app.should_quit {
+            break Ok(());
+        }
+
+        if app.rescan_requested {
+            app.reset_for_rescan();
+            tree_state = TreeWidgetState::default();
+            let coordinator = ScanCoordinator::new(config.clone(), rules.clone(), app_paths.clone());
+            scan_rx = coordinator.start();
+        }
+    };
 
     // ── Restore terminal unconditionally ──────────────────────────────────
     disable_raw_mode()?;
@@ -52,30 +72,6 @@ pub fn run_tui(config: ScanConfig, rules: Vec<Rule>, app_paths: AppPaths) -> any
     terminal.show_cursor()?;
 
     result
-}
-
-fn run_loop(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    app: &mut App,
-    tree_state: &mut TreeWidgetState,
-    scan_rx: std::sync::mpsc::Receiver<ScanEvent>,
-) -> anyhow::Result<()> {
-    loop {
-        terminal.draw(|f| draw(f, app, tree_state))?;
-
-        match next_event(&scan_rx) {
-            Some(AppEvent::Input(event)) => handle_input(app, event),
-            Some(AppEvent::Scan(ev)) => handle_scan_event(app, ev),
-            Some(AppEvent::Tick) => app.on_tick(),
-            None => {}
-        }
-
-        if app.should_quit {
-            break;
-        }
-    }
-
-    Ok(())
 }
 
 fn handle_scan_event(app: &mut App, event: ScanEvent) {
@@ -97,6 +93,7 @@ fn handle_scan_event(app: &mut App, event: ScanEvent) {
         }
         ScanEvent::Complete(_summary) => {
             app.scan_complete = true;
+            app.status_message = None;
         }
     }
 }

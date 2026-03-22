@@ -71,6 +71,7 @@ pub fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
             ("s", "sort"),
             ("f", "filter by safety"),
             ("t", "trash"),
+            ("R", "rescan"),
             ("?", "help"),
             ("q", "quit"),
         ],

@@ -629,7 +629,6 @@ pub struct App {
     pub scan_complete: bool,
     pub scan_progress: ScanProgressState,
     pub should_quit: bool,
-    #[allow(dead_code)]
     pub app_paths: AppPaths,
     /// Incremented each tick to drive the spinner animation.
     pub tick_count: u64,
@@ -643,6 +642,8 @@ pub struct App {
     pub trash_browser: TrashBrowserState,
     /// Cached trash stats (item count, total bytes).
     pub trash_stats: TrashStats,
+    /// Set to true when user requests a rescan.
+    pub rescan_requested: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -675,7 +676,20 @@ impl App {
             trash_manager,
             trash_browser: TrashBrowserState::default(),
             trash_stats,
+            rescan_requested: false,
         }
+    }
+
+    /// Reset state for a fresh rescan. Clears the tree and progress but keeps
+    /// trash manager and trash stats.
+    pub fn reset_for_rescan(&mut self) {
+        self.tree = TreeState::default();
+        self.scan_complete = false;
+        self.scan_progress = ScanProgressState::default();
+        self.scan_errors.clear();
+        self.status_message = Some("rescanning...".to_string());
+        self.mode = AppMode::Normal;
+        self.rescan_requested = false;
     }
 
     /// Refresh cached trash stats from the trash manager.

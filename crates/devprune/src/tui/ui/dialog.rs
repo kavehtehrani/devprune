@@ -134,6 +134,7 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
         ("  t", "Open trash browser"),
         ("", ""),
         ("General", ""),
+        ("  R", "Rescan directories"),
         ("  ?", "Toggle this help"),
         ("  q / Ctrl-C", "Quit"),
         ("", ""),
