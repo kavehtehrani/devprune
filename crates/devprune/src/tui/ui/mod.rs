@@ -7,7 +7,7 @@ pub mod tree;
 use bytesize::ByteSize;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Widget},
@@ -17,7 +17,7 @@ use crate::tui::app::{App, AppMode};
 use crate::tui::ui::{
     details::DetailsPanel,
     dialog::{render_confirm_delete, render_confirm_quit, render_help, render_trash_browser},
-    status_bar::render_header_content,
+    status_bar::{render_header_content, render_proportional_bar},
     tree::{TreeWidget, TreeWidgetState},
 };
 
@@ -29,7 +29,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // header block
+            Constraint::Length(4), // header block (border + status + proportional bar + border)
             Constraint::Min(0),    // body (tree + details)
             Constraint::Length(4), // footer block (border + 2 lines for wrapping + border)
         ])
@@ -42,7 +42,16 @@ pub fn draw(frame: &mut Frame, app: &mut App, tree_state: &mut TreeWidgetState) 
         .border_style(Style::default().fg(theme::BORDER));
     let header_inner = header_block.inner(main_chunks[0]);
     frame.render_widget(header_block, main_chunks[0]);
-    render_header_content(frame, header_inner, app);
+
+    // Split header inner: line 1 = scan status, line 2 = proportional bar
+    if header_inner.height >= 2 {
+        let status_area = Rect::new(header_inner.x, header_inner.y, header_inner.width, 1);
+        let bar_area = Rect::new(header_inner.x, header_inner.y + 1, header_inner.width, 1);
+        render_header_content(frame, status_area, app);
+        render_proportional_bar(frame, bar_area, app);
+    } else {
+        render_header_content(frame, header_inner, app);
+    }
 
     // ── Body: tree (65%) | details (35%) ────────────────────────────────
     let body_chunks = Layout::default()
