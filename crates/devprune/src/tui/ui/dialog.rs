@@ -126,8 +126,9 @@ pub fn render_help(frame_area: Rect, buf: &mut Buffer) {
 }
 
 pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut TrashBrowserState) {
-    let dialog_width = 78u16.min(frame_area.width.saturating_sub(4));
-    let dialog_height = 20u16.min(frame_area.height.saturating_sub(4));
+    // Use most of the available space so paths have room.
+    let dialog_width = frame_area.width.saturating_sub(4).max(40);
+    let dialog_height = frame_area.height.saturating_sub(4).max(10);
     let area = centered_rect(dialog_width, dialog_height, frame_area);
 
     Clear.render(area, buf);
@@ -150,25 +151,14 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         Span::styled("Esc", Style::default().fg(theme::FOOTER_KEY_FG)),
         Span::raw(":back "),
     ]);
-    // Show full path of highlighted item in a second bottom title (right-aligned).
-    let path_line = state.items.get(state.cursor).map(|entry| {
-        let path_str = format!(" {} ", entry.original_path.display());
-        Line::from(vec![
-            Span::styled(path_str, Style::default().fg(theme::DIMMED)),
-        ]).alignment(Alignment::Right)
-    });
 
-    let mut block = Block::default()
+    let block = Block::default()
         .title(title)
         .title_alignment(Alignment::Center)
         .title_bottom(hint_line)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme::DIALOG_BORDER))
         .style(Style::default().bg(theme::DIALOG_BG));
-
-    if let Some(pl) = path_line {
-        block = block.title_top(pl);
-    }
 
     let inner = block.inner(area);
     block.render(area, buf);
@@ -193,11 +183,12 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         return;
     }
 
-    let list_height = inner.height as usize;
+    // Reserve last line for the full path of the highlighted item.
+    let list_height = inner.height.saturating_sub(1) as usize;
     // Adjust scroll offset so cursor stays in view (same logic as tree widget).
     if state.cursor < state.scroll_offset {
         state.scroll_offset = state.cursor;
-    } else if state.cursor >= state.scroll_offset + list_height {
+    } else if list_height > 0 && state.cursor >= state.scroll_offset + list_height {
         state.scroll_offset = state.cursor - list_height + 1;
     }
     let offset = state.scroll_offset;
@@ -258,6 +249,23 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &mut Tras
         // Category
         let cat_span = Span::styled(format!(" {cat_str}"), Style::default().fg(theme::DIMMED).bg(row_bg));
         Line::from(vec![cat_span]).render(Rect::new(x, y, cat_col as u16, 1), buf);
+    }
+
+    // Full path of highlighted item on the last line.
+    if let Some(entry) = state.items.get(state.cursor) {
+        let path_y = inner.y + inner.height.saturating_sub(1);
+        let full_path = format!(" {} ", entry.original_path.display());
+        // Truncate from the left if needed.
+        let max_w = inner.width as usize;
+        let display = if full_path.len() > max_w && max_w > 4 {
+            format!(" ...{} ", &full_path[full_path.len() - max_w + 5..])
+        } else {
+            full_path
+        };
+        Line::from(vec![
+            Span::styled(display, Style::default().fg(theme::SPINNER_FG)),
+        ])
+        .render(Rect::new(inner.x, path_y, inner.width, 1), buf);
     }
 
     // Scrollbar when content overflows.
