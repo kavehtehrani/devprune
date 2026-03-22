@@ -424,6 +424,61 @@ impl TreeState {
         }
     }
 
+    /// Expand the node at cursor. If already expanded or a leaf, no-op.
+    pub fn expand(&mut self, cursor: usize) {
+        let rows = self.visible_rows();
+        if cursor >= rows.len() {
+            return;
+        }
+        match rows[cursor].row_ref.clone() {
+            RowRef::Category { cat_idx } => {
+                self.categories[cat_idx].expanded = true;
+            }
+            RowRef::RuleGroup { cat_idx, grp_idx } => {
+                self.categories[cat_idx].children[grp_idx].expanded = true;
+            }
+            RowRef::Artifact { .. } => {}
+        }
+    }
+
+    /// Collapse the node at cursor. If on a leaf, collapse the parent instead.
+    pub fn collapse(&mut self, cursor: usize) {
+        let rows = self.visible_rows();
+        if cursor >= rows.len() {
+            return;
+        }
+        match rows[cursor].row_ref.clone() {
+            RowRef::Category { cat_idx } => {
+                self.categories[cat_idx].expanded = false;
+            }
+            RowRef::RuleGroup { cat_idx, grp_idx } => {
+                if self.categories[cat_idx].children[grp_idx].expanded {
+                    self.categories[cat_idx].children[grp_idx].expanded = false;
+                } else {
+                    // Already collapsed - jump cursor to parent category
+                    // Find the category row in visible rows
+                    for (i, r) in rows.iter().enumerate() {
+                        if matches!(&r.row_ref, RowRef::Category { cat_idx: ci } if *ci == cat_idx) {
+                            self.cursor = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            RowRef::Artifact { cat_idx, grp_idx, .. } => {
+                // On a leaf - collapse the parent rule group
+                self.categories[cat_idx].children[grp_idx].expanded = false;
+                // Jump cursor to the rule group row
+                for (i, r) in rows.iter().enumerate() {
+                    if matches!(&r.row_ref, RowRef::RuleGroup { cat_idx: ci, grp_idx: gi } if *ci == cat_idx && *gi == grp_idx) {
+                        self.cursor = i;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn select_all(&mut self, checked: bool) {
         let state = if checked { CheckState::Checked } else { CheckState::Unchecked };
         for cat in &mut self.categories {
@@ -733,7 +788,7 @@ mod tests {
         let mut tree = TreeState::default();
         tree.add_artifact(make_artifact("/tmp/a", "npm", Category::Dependencies));
         let rows_expanded = tree.visible_rows().len();
-        tree.toggle_expand(0); // collapse category
+        tree.collapse(0); // collapse category
         let rows_collapsed = tree.visible_rows().len();
         assert!(rows_expanded > rows_collapsed);
     }

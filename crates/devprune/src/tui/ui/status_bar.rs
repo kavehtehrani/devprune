@@ -162,7 +162,7 @@ fn mode_hints(mode: &AppMode) -> Vec<(&'static str, &'static str)> {
         AppMode::Normal => vec![
             ("j/k", "move"),
             ("Space", "check"),
-            ("Enter", "expand"),
+            ("h/l", "collapse/expand"),
             ("a/A", "all/none"),
             ("d", "delete"),
             ("/", "search"),

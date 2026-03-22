@@ -24,14 +24,20 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         KeyCode::PageDown => app.tree.move_cursor(10),
         KeyCode::PageUp => app.tree.move_cursor(-10),
 
-        // Check / expand
-        KeyCode::Char(' ') => {
+        // Check
+        KeyCode::Char(' ') | KeyCode::Enter => {
             let cursor = app.tree.cursor;
             app.tree.toggle_check(cursor);
         }
-        KeyCode::Enter => {
+
+        // Expand / collapse tree nodes
+        KeyCode::Right | KeyCode::Char('l') => {
             let cursor = app.tree.cursor;
-            app.tree.toggle_expand(cursor);
+            app.tree.expand(cursor);
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            let cursor = app.tree.cursor;
+            app.tree.collapse(cursor);
         }
 
         // Bulk selection
