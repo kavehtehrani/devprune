@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap},
 };
 
 use crate::tui::app::{App, TrashBrowserState};
@@ -214,6 +214,19 @@ pub fn render_trash_browser(frame_area: Rect, buf: &mut Buffer, state: &TrashBro
     Paragraph::new(lines)
         .wrap(Wrap { trim: false })
         .render(inner, buf);
+
+    // Scrollbar when content overflows.
+    let total_items = state.items.len();
+    if total_items > list_height {
+        let mut scrollbar_state = ScrollbarState::new(total_items)
+            .position(offset);
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .track_style(Style::default().fg(theme::BORDER))
+            .thumb_style(Style::default().fg(theme::DIMMED))
+            .render(inner, buf, &mut scrollbar_state);
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

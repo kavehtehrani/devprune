@@ -4,7 +4,7 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, StatefulWidget, Widget},
+    widgets::{Block, Borders, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
 };
 
 
@@ -68,6 +68,19 @@ impl<'a> StatefulWidget for TreeWidget<'a> {
             let y = inner.y + i as u16;
             let is_cursor = (state.offset + i) == cursor;
             render_row(buf, inner.x, y, inner.width, row, is_cursor);
+        }
+
+        // Scrollbar (only when content overflows).
+        let total_rows = rows.len();
+        if total_rows > visible_height {
+            let mut scrollbar_state = ScrollbarState::new(total_rows)
+                .position(state.offset);
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None)
+                .track_style(Style::default().fg(theme::BORDER))
+                .thumb_style(Style::default().fg(theme::DIMMED))
+                .render(inner, buf, &mut scrollbar_state);
         }
     }
 }
