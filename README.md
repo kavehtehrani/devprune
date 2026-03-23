@@ -7,7 +7,22 @@ Scans your filesystem for `node_modules`, `target/`, `.venv`, `__pycache__`, `bu
 > [!NOTE]  
 > This project is heavily coded with AI and is currently in beta.
 
+![dashboard.png](images/dashboard.png)
+![trash.png](images/trash.png)
+
 ## Install
+
+### Quick install (Linux/macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kavehtehrani/devprune/main/install.sh | sh
+```
+
+Installs to `~/.local/bin`. Make sure it's in your PATH:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 ### Pre-built binaries
 
